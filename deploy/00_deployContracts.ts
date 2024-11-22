@@ -1,0 +1,52 @@
+import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { DeployFunction } from "hardhat-deploy/types";
+import { getRouterLibraries } from "../utilities";
+
+const deployRouterContract: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  const { deployer } = await hre.getNamedAccounts();
+  const { upgrades } = hre;
+  const { ethers } = hre;
+
+  const Gainz = await ethers.getContractFactory("Gainz");
+  const gainzToken = await upgrades.deployProxy(Gainz);
+  await gainzToken.waitForDeployment();
+
+  const Router = await ethers.getContractFactory("Router", {
+    libraries: await getRouterLibraries(ethers),
+  });
+  const gainzAddress = await gainzToken.getAddress();
+  const router = await upgrades.deployProxy(Router, [deployer], {
+    unsafeAllow: ["external-library-linking"],
+  });
+
+  await router.runInit(gainzAddress);
+
+  const routerAddress = await router.getAddress();
+
+  const Views = await ethers.getContractFactory("Views", {
+    libraries: {
+      AMMLibrary: await (await ethers.deployContract("AMMLibrary")).getAddress(),
+    },
+  });
+  const views = await Views.deploy(routerAddress, await router.getPairsBeacon());
+  await views.waitForDeployment();
+
+  const artifactsToSave = [
+    ["Gainz", gainzAddress],
+    ["Router", routerAddress],
+    ["Views", await views.getAddress()],
+  ];
+
+  const { save, getExtendedArtifact } = hre.deployments;
+  for (const [contract, address] of artifactsToSave) {
+    const { abi, metadata } = await getExtendedArtifact(contract);
+    await save(contract, { abi, metadata, address });
+  }
+  await router.waitForDeployment();
+};
+
+export default deployRouterContract;
+
+// Tags are useful if you have multiple deploy files and only want to run one of them.
+// e.g. yarn deploy --tags RouterContract
+deployRouterContract.tags = ["initialDeployment"];
