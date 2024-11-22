@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -215,7 +215,7 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		amount1 = (liquidity * balance1) / _totalSupply; // using balances ensures pro-rata distribution
 		require(
 			amount0 > 0 && amount1 > 0,
-			"Pair: INSUFFICIENT_LIQUIDITY_BURNED"
+			"PairV2: INSUFFICIENT_LIQUIDITY_BURNED"
 		);
 		_burn(address(this), liquidity);
 		_safeTransfer(_token0, to, amount0);

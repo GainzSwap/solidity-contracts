@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 interface IPair {
 	event Mint(address indexed sender, uint256 amount0, uint256 amount1);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -365,7 +365,6 @@ contract Router is
 		// Swap and prepare to unWrap Native if needed
 		bool autoUnwrap = to != _getRouterStorage().governance &&
 			path[path.length - 1] == address(wNtv);
-		// console.log(to , _getRouterStorage().governance, autoUnwrap);
 		_swap(amounts, path, autoUnwrap ? address(this) : to);
 		if (autoUnwrap)
 			path[path.length - 1].sendFungibleToken(

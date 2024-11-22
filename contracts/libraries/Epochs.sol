@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 /// @title Epochs and Periods Management Library
 /// @notice Provides functions to manage and calculate epochs and periods based on a genesis timestamp and epoch length.
