@@ -53,14 +53,12 @@ task("upgradeToMainnet", "").setAction(async (_, hre) => {
   const { ethers } = hre;
 
   const { deployer } = await hre.getNamedAccounts();
-  const routerV2 = await ethers.getContract<RouterV2>("RouterV2", deployer);
+  const routerV2 = await ethers.getContract<RouterV2>("Router", deployer);
 
   const routerAddress = await routerV2.getAddress();
   const wNtvAddress = await routerV2.getWrappedNativeToken();
-  const govAddress = await routerV2.getGovernance();
-  const gTokenAddress = await (await ethers.getContractAt("GovernanceV2", govAddress)).getGToken();
-
-  deleteFolder("deployments/" + hre.network.name);
+  const govAddress = "0x4C1dA4CAc2cb12e8a986C293f3CaEAb571fAE29A";
+  const gTokenAddress = "0xbcD57d6f6324A2E30f9cFd6528b6d22505Ae13EC";
 
   const routerFactory = async () =>
     ethers.getContractFactory("Router", {
@@ -79,10 +77,6 @@ task("upgradeToMainnet", "").setAction(async (_, hre) => {
   await hre.upgrades.upgradeProxy(routerProxy, await routerFactory(), {
     unsafeAllow: ["external-library-linking"],
   });
-
-  const router = await ethers.getContractAt("Router", routerAddress);
-
-  await router.setPriceOracle();
 
   const govProxy = await hre.upgrades.forceImport(govAddress, await govFactory());
   await hre.upgrades.upgradeProxy(govProxy, await govFactory(), {
