@@ -1,4 +1,5 @@
 import { ethers as e } from "hardhat";
+import { parseEther as _parseEther } from "ethers";
 
 export async function getGovernanceLibraries(ethers: typeof e) {
   return {
@@ -56,3 +57,5 @@ export async function copyFilesRecursively(src: string, dest: string): Promise<v
     }
   }
 }
+
+export const parseEther = (ether: string) => _parseEther(ether.replace(/,/g, ""));

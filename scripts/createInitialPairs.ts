@@ -1,57 +1,86 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
-import { Gainz, Router } from "../typechain-types";
-import { parseEther } from "ethers";
+import { Gainz, Router, Views } from "../typechain-types";
+import { formatEther as _formatEther, parseEther as _parseEther } from "ethers";
+import { parseEther } from "../utilities";
+
+const formatEther = (wei: Parameters<typeof _formatEther>[0]) =>
+  parseFloat(_formatEther(wei)).toLocaleString("en-US", {
+    minimumFractionDigits: 18,
+    maximumFractionDigits: 18,
+  });
 
 task("createInitialPairs", "").setAction(async (_, hre) => {
-  const { ethers } = hre;
-  const { deployer } = await hre.getNamedAccounts();
-
-  if (hre.network.name != "localhost" && !process.env.STABLE_COIN_ADDRESS) {
-    throw new Error("Stable Coin address not set");
+  if (hre.network.name !== "localhost") {
+    return;
   }
+  const { ethers } = hre;
+  const [deployer, founder, angel, SI, initLp] = await ethers.getSigners();
 
   const router = await ethers.getContract<Router>("Router", deployer);
-  const stableCoinAddress =
-    process.env.STABLE_COIN_ADDRESS ||
-    (await (await ethers.deployContract("TestERC20", ["Stable Coin", "STB", 4])).getAddress());
+  const views = await ethers.getContract<Views>("Views", deployer);
+  const governance = await ethers.getContractAt("Governance", await router.getGovernance());
+  const gToken = await ethers.getContractAt("GToken", await governance.getGToken());
 
   const gainz = await ethers.getContract<Gainz>("Gainz", deployer);
   const gainzAddress = await gainz.getAddress();
+  const maxSupply = await gainz.totalSupply();
 
   const wNativeToken = await router.getWrappedNativeToken();
 
-  for (const [tokenA, tokenB] of [
-    [gainzAddress, stableCoinAddress],
-    [wNativeToken, gainzAddress],
-    [wNativeToken, stableCoinAddress],
-  ]) {
-    try {
-      await (await ethers.getContractAt("ERC20", tokenA)).approve(router, parseEther("1"));
-    } catch (error) {}
+  const lpPartnersGainz = parseEther(process.env.LP_PARTNERS_GAINZ!);
+  const eduPockets: [string, bigint][] = process.env.LP_PARTNERS_EDU_DISTRIBUTION!.split(";").map(group => {
+    const [eduRaised, discount] = group.split("-");
 
-    await (await ethers.getContractAt("ERC20", tokenB)).approve(router, parseEther("1"));
+    return [eduRaised, (BigInt(discount) * lpPartnersGainz) / 100n];
+  });
 
-    console.log("\n\nCreating Pair", { tokenA, tokenB, wNativeToken }, "\n\n");
+  let totalGainzUsed = 0n;
 
-    try {
-      await router.createPair(
-        { token: tokenA, nonce: 0, amount: parseEther("1") },
-        { token: tokenB, nonce: 0, amount: parseEther("0.005") },
-        { value: tokenA == wNativeToken ? parseEther("1") : 0 },
-      );
-    } catch (error) {
-      console.log(error);
-    }
+  // Initial liquidity
+  const initLiq = eduPockets.shift()!;
+  const paymentA = { token: wNativeToken, nonce: 0, amount: parseEther(initLiq[0]) };
+  const paymentB = { token: gainzAddress, nonce: 0, amount: initLiq[1] };
+
+  await gainz.approve(router, paymentB.amount);
+  await router.connect(deployer).createPair(paymentA, paymentB, { value: paymentA.amount });
+
+  totalGainzUsed += paymentB.amount;
+
+  // Other Community Discount Liquidty
+  for (const [amt, gainzAmt] of eduPockets) {
+    const amount = parseEther(amt);
+
+    await governance
+      .connect(initLp)
+      .stake({ ...paymentA, amount }, 1080, [[wNativeToken], [wNativeToken, gainzAddress], [wNativeToken]], 1, 1, {
+        value: amount,
+      });
+
+    const gainzPayment = { token: gainzAddress, nonce: 0, amount: gainzAmt };
+
+    await gainz.transfer(initLp, gainzPayment.amount);
+    await gainz.connect(initLp).approve(governance, gainzPayment.amount);
+    await governance
+      .connect(initLp)
+      .stake(gainzPayment, 1080, [[gainzAddress], [gainzAddress, wNativeToken], [gainzAddress, wNativeToken]], 1, 1);
+
+    totalGainzUsed += gainzPayment.amount;
+
+    console.log({
+      amount: formatEther(amount),
+      gainzAmt: formatEther(gainzAmt),
+    });
   }
 
-  if (hre.network.name == "localhost") {
-    // Send network tokens
-    const testers = process.env.TESTERS?.split(",") ?? [];
-    await Promise.all(
-      testers.map(async tester =>
-        (await ethers.getSigner(deployer)).sendTransaction({ value: parseEther("99"), to: tester }),
-      ),
-    );
+  if (process.env.IS_ANGEL_FUNDED) {
+    await gainz.transfer(founder, (maxSupply * 2n) / 100n);
+    await gainz.transfer(angel, (maxSupply * 7n) / 100n);
+    await gainz.transfer(SI, (maxSupply * 10n) / 100n);
   }
+
+  console.log({
+    totalGainzUsed: formatEther(totalGainzUsed),
+    ratio: +totalGainzUsed.toString() / +maxSupply.toString(),
+  });
 });

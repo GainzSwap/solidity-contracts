@@ -18,6 +18,7 @@ import "./scripts/upgradeGovernance";
 import "./scripts/upgradeToMainnet";
 import "./scripts/upgradeRouter";
 import "./scripts/moveTime";
+import { parseEther } from "./utilities";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey =
@@ -48,6 +49,10 @@ const config: HardhatUserConfig = {
     // If the network you are looking for is not here you can add new network settings
     hardhat: {
       mining: { auto: true, interval: 12_000 },
+      accounts: {
+        mnemonic: "test test test test test test test test test test test junk",
+        accountsBalance: parseEther("50,000,000").toString(),
+      },
     },
     opencampus: {
       url: "https://rpc.open-campus-codex.gelato.digital",
