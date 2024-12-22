@@ -18,6 +18,7 @@ const deployRouterContract: DeployFunction = async function (hre: HardhatRuntime
   const router = await upgrades.deployProxy(Router, [deployer], {
     unsafeAllow: ["external-library-linking"],
   });
+  await router.waitForDeployment();
 
   await router.runInit(gainzAddress);
 
@@ -42,7 +43,6 @@ const deployRouterContract: DeployFunction = async function (hre: HardhatRuntime
     const { abi, metadata } = await getExtendedArtifact(contract);
     await save(contract, { abi, metadata, address });
   }
-  await router.waitForDeployment();
 };
 
 export default deployRouterContract;

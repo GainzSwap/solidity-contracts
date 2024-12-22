@@ -56,3 +56,50 @@ export async function copyFilesRecursively(src: string, dest: string): Promise<v
     }
   }
 }
+
+import { HardhatRuntimeEnvironment } from "hardhat/types";
+
+export async function getDeploymentTxHashFromNetwork(
+  hre: HardhatRuntimeEnvironment,
+  contractAddress: string,
+  startBlock = 0,
+) {
+  try {
+    // Fetch the transaction receipt for the contract creation
+    const provider = hre.ethers.provider;
+    const code = await provider.getCode(contractAddress);
+
+    if (code === "0x") {
+      console.error(`No contract found at address ${contractAddress}`);
+      return null;
+    }
+
+    // Iterate through blocks to find the deployment transaction
+    const latestBlock = await provider.getBlockNumber();
+    for (let blockNumber = startBlock; blockNumber <= latestBlock; blockNumber++) {
+      const block = await provider.getBlock(blockNumber);
+
+      // Iterate through transactions in the block
+      for (const txHash of block?.transactions || []) {
+        const tx = await provider.getTransaction(txHash);
+
+        // Deployment transactions have `to` set to null
+        if (tx && tx.to === null) {
+          const receipt = await provider.getTransactionReceipt(tx.hash);
+
+          if (receipt && receipt.contractAddress === contractAddress) {
+            console.log(`Deployment transaction hash found: ${tx.hash}`);
+
+            return receipt;
+          }
+        }
+      }
+    }
+
+    console.error(`Deployment transaction not found for contract at ${contractAddress}`);
+    return null;
+  } catch (error: any) {
+    console.error(`Error fetching transaction hash: ${error.message}`);
+    return null;
+  }
+}
