@@ -19,8 +19,6 @@ interface IPair {
 	);
 	event Sync(uint112 reserve0, uint112 reserve1);
 
-	function MINIMUM_LIQUIDITY() external pure returns (uint256);
-
 	function router() external view returns (address);
 
 	function token0() external view returns (address);
@@ -36,8 +34,6 @@ interface IPair {
 
 	function price1CumulativeLast() external view returns (uint256);
 
-	function kLast() external view returns (uint);
-
 	function mint(address to) external returns (uint256 liquidity);
 
 	function burn(
@@ -45,8 +41,6 @@ interface IPair {
 	) external returns (uint256 amount0, uint256 amount1);
 
 	function swap(uint256 amount0Out, uint256 amount1Out, address to) external;
-
-	function skim(address to) external;
 
 	function sync() external;
 

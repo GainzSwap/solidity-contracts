@@ -63,9 +63,8 @@ library AMMLibrary {
 			reserveIn > 0 && reserveOut > 0,
 			"AMMLibrary: INSUFFICIENT_LIQUIDITY"
 		);
-		uint amountInWithFee = amountIn * (997);
-		uint numerator = amountInWithFee * (reserveOut);
-		uint denominator = (reserveIn * 1000) + (amountInWithFee);
+		uint numerator = amountIn * reserveOut;
+		uint denominator = reserveIn + amountIn;
 		amountOut = numerator / denominator;
 	}
 
@@ -80,9 +79,9 @@ library AMMLibrary {
 			reserveIn > 0 && reserveOut > 0,
 			"AMMLibrary: INSUFFICIENT_LIQUIDITY"
 		);
-		uint numerator = reserveIn * (amountOut) * (1000);
-		uint denominator = (reserveOut - amountOut) * (997);
-		amountIn = (numerator / denominator) + (1);
+		uint numerator = reserveIn * amountOut;
+		uint denominator = reserveOut - amountOut;
+		amountIn = (numerator / denominator) + 1;
 	}
 
 	// performs chained getAmountOut calculations on any number of pairs

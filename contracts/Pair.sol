@@ -17,7 +17,7 @@ import "./types.sol";
 contract Pair is IPair, PairERC20, OwnableUpgradeable {
 	using UQ112x112 for uint224;
 
-	uint public constant MINIMUM_LIQUIDITY = 10 ** 3;
+	uint constant MINIMUM_LIQUIDITY = 10 ** 3;
 	bytes4 private constant SELECTOR =
 		bytes4(keccak256(bytes("transfer(address,uint256)")));
 
@@ -141,32 +141,6 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		return _getPairStorage().price1CumulativeLast;
 	}
 
-	// if fee is on, mint liquidity equivalent to 1/6th of the growth in sqrt(k)
-	function _mintFee(
-		uint112 _reserve0,
-		uint112 _reserve1
-	) private returns (bool feeOn) {
-		PairStorage storage $ = _getPairStorage();
-
-		address feeTo = ISwapFactory($.router).feeTo();
-		feeOn = feeTo != address(0);
-		uint _kLast = $.kLast; // gas savings
-		if (feeOn) {
-			if (_kLast != 0) {
-				uint rootK = Math.sqrt(uint256(_reserve0) * uint256(_reserve1));
-				uint rootKLast = Math.sqrt(_kLast);
-				if (rootK > rootKLast) {
-					uint numerator = totalSupply() * (rootK - rootKLast);
-					uint denominator = (rootK * 5) + rootKLast;
-					uint liquidity = numerator / denominator;
-					if (liquidity > 0) _mint(feeTo, liquidity);
-				}
-			}
-		} else if (_kLast != 0) {
-			$.kLast = 0;
-		}
-	}
-
 	// this low-level function should be called from a contract which performs important safety checks
 	function mint(address to) external lock onlyOwner returns (uint liquidity) {
 		PairStorage storage $ = _getPairStorage();
@@ -177,7 +151,6 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		uint amount0 = balance0 - reserve0;
 		uint amount1 = balance1 - reserve1;
 
-		bool feeOn = _mintFee(reserve0, reserve1);
 		uint _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
 		if (_totalSupply == 0) {
 			liquidity = Math.sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
@@ -192,7 +165,6 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		_mint(to, liquidity);
 
 		_update(balance0, balance1, reserve0, reserve1);
-		if (feeOn) $.kLast = uint256($.reserve0) * uint256($.reserve1); // reserve0 and reserve1 are up-to-date
 		emit Mint(msg.sender, amount0, amount1);
 	}
 
@@ -209,7 +181,6 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		uint balance1 = IERC20(_token1).balanceOf(address(this));
 		uint liquidity = balanceOf(address(this));
 
-		bool feeOn = _mintFee(_reserve0, _reserve1);
 		uint _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
 		amount0 = (liquidity * balance0) / _totalSupply; // using balances ensures pro-rata distribution
 		amount1 = (liquidity * balance1) / _totalSupply; // using balances ensures pro-rata distribution
@@ -224,7 +195,6 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		balance1 = IERC20(_token1).balanceOf(address(this));
 
 		_update(balance0, balance1, _reserve0, _reserve1);
-		if (feeOn) $.kLast = uint256($.reserve0) * uint256($.reserve1); // reserve0 and reserve1 are up-to-date
 		emit Burn(msg.sender, amount0, amount1, to);
 	}
 
@@ -235,12 +205,12 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 	) external lock onlyOwner {
 		require(
 			amount0Out > 0 || amount1Out > 0,
-			"Pair: INSUFFICIENT_OUTPUT_AMOUNT"
+			"GainzSwap: INSUFFICIENT_OUTPUT_AMOUNT"
 		);
 		(uint112 _reserve0, uint112 _reserve1, ) = getReserves(); // gas savings
 		require(
 			amount0Out < _reserve0 && amount1Out < _reserve1,
-			"Pair: INSUFFICIENT_LIQUIDITY"
+			"GainzSwap: INSUFFICIENT_LIQUIDITY"
 		);
 
 		uint balance0;
@@ -251,13 +221,14 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 			// scope for _token{0,1}, avoids stack too deep errors
 			address _token0 = $.token0;
 			address _token1 = $.token1;
-			require(to != _token0 && to != _token1, "Pair: INVALID_TO");
+			require(to != _token0 && to != _token1, "GainzSwap: INVALID_TO");
 			if (amount0Out > 0) _safeTransfer(_token0, to, amount0Out); // optimistically transfer tokens
 			if (amount1Out > 0) _safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
 
 			balance0 = IERC20(_token0).balanceOf(address(this));
 			balance1 = IERC20(_token1).balanceOf(address(this));
 		}
+
 		uint amount0In = balance0 > _reserve0 - amount0Out
 			? balance0 - (_reserve0 - amount0Out)
 			: 0;
@@ -266,28 +237,26 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 			: 0;
 		require(
 			amount0In > 0 || amount1In > 0,
-			"Pair: INSUFFICIENT_INPUT_AMOUNT"
+			"GainzSwap: INSUFFICIENT_INPUT_AMOUNT"
 		);
-		{
-			// scope for reserve{0,1}Adjusted, avoids stack too deep errors
-			uint balance0Adjusted = (balance0 * 1000) - (amount0In * 3);
-			uint balance1Adjusted = (balance1 * 1000) - (amount1In * 3);
-			require(
-				(balance0Adjusted * balance1Adjusted) >=
-					uint(_reserve0) * _reserve1 * (1000 ** 2),
-				"Pair: K"
-			);
-		}
+
+		require(
+			balance0 * balance1 >= uint(_reserve0) * uint(_reserve1),
+			"GainzSwap: K"
+		);
 
 		_update(balance0, balance1, _reserve0, _reserve1);
 		emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
 	}
 
-	function skim(address to) external {}
+	function sync() external {
+		PairStorage storage $ = _getPairStorage();
 
-	function sync() external {}
-
-	function kLast() external view override returns (uint) {
-		return _getPairStorage().kLast;
+		_update(
+			IERC20($.token0).balanceOf(address(this)),
+			IERC20($.token1).balanceOf(address(this)),
+			$.reserve0,
+			$.reserve1
+		);
 	}
 }
