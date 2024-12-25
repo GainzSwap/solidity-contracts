@@ -19,6 +19,7 @@ import "./scripts/upgradeToMainnet";
 import "./scripts/upgradeRouter";
 import "./scripts/moveTime";
 import './scripts/updateStartBlock'
+import "./scripts/upgradePairs";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey =
