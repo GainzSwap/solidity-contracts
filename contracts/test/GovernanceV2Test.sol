@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { Test } from "../../lib/forge-std/src/Test.sol";
+import { Test } from "forge-std/Test.sol";
 import { Governance } from "../Governance.sol";
 import { Router } from "../Router.sol";
 import { TokenPayment, TokenPayments } from "../libraries/TokenPayments.sol";

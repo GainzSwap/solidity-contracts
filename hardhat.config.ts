@@ -20,6 +20,7 @@ import "./scripts/upgradeRouter";
 import "./scripts/moveTime";
 import './scripts/updateStartBlock'
 import "./scripts/upgradePairs";
+import "./scripts/runE2ELocalnet";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey =

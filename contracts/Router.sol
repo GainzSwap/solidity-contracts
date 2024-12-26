@@ -250,10 +250,18 @@ contract Router is
 		_;
 	}
 
+	address _originalCaller;
+	modifier captureOriginalCaller() {
+		assert(_originalCaller == address(0));
+		_originalCaller = msg.sender;
+		_;
+		_originalCaller = address(0);
+	}
+
 	function registerAndSwap(
 		uint256 referrerId,
 		bytes calldata swapData
-	) external payable {
+	) external payable captureOriginalCaller {
 		// Step 1: Register user or get existing user ID
 		_createOrGetUserId(msg.sender, referrerId);
 
@@ -355,7 +363,9 @@ contract Router is
 			} else {
 				TransferHelper.safeTransferFrom(
 					path[0],
-					msg.sender,
+					_originalCaller == address(0)
+						? msg.sender
+						: _originalCaller,
 					pair,
 					amounts[0]
 				);

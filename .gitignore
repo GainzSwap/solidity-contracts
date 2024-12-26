@@ -32,3 +32,5 @@ temp
 # foundry
 out
 cache_forge
+
+scripts/runE2ELocalnet/wallets.json
