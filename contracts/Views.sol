@@ -23,30 +23,32 @@ contract Views {
 	function getAmountOut(
 		uint amountIn,
 		uint reserveIn,
-		uint reserveOut
-	) public pure virtual returns (uint amountOut) {
-		return AMMLibrary.getAmountOut(amountIn, reserveIn, reserveOut);
+		uint reserveOut,
+		address pair
+	) public view virtual returns (uint[2] memory) {
+		return AMMLibrary.getAmountOut(amountIn, reserveIn, reserveOut, pair);
 	}
 
 	function getAmountIn(
 		uint amountOut,
 		uint reserveIn,
-		uint reserveOut
-	) public pure virtual returns (uint amountIn) {
-		return AMMLibrary.getAmountIn(amountOut, reserveIn, reserveOut);
+		uint reserveOut,
+		address pair
+	) public view virtual returns (uint[2] memory) {
+		return AMMLibrary.getAmountIn(amountOut, reserveIn, reserveOut, pair);
 	}
 
 	function getAmountsOut(
 		uint amountIn,
 		address[] memory path
-	) public view virtual returns (uint[] memory amounts) {
+	) public view virtual returns (uint[2][] memory) {
 		return AMMLibrary.getAmountsOut(router, pairsBeacon, amountIn, path);
 	}
 
 	function getAmountsIn(
 		uint amountOut,
 		address[] memory path
-	) public view virtual returns (uint[] memory amounts) {
+	) public view virtual returns (uint[2][] memory) {
 		return AMMLibrary.getAmountsIn(router, pairsBeacon, amountOut, path);
 	}
 }

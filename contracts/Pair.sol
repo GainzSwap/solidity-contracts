@@ -9,6 +9,7 @@ import { ISwapFactory } from "./interfaces/ISwapFactory.sol";
 
 import { Math } from "./libraries/Math.sol";
 import { UQ112x112 } from "./libraries/UQ112x112.sol";
+import { FullMath } from "./libraries/FullMath.sol";
 
 import { PairERC20 } from "./abstracts/PairERC20.sol";
 
@@ -18,6 +19,11 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 	using UQ112x112 for uint224;
 
 	uint constant MINIMUM_LIQUIDITY = 10 ** 3;
+
+	uint constant FEE_BASIS_POINTS = 100_00; // 100%
+	uint constant MINIMUM_FEE = 5; // 0.05%
+	uint constant MAXIMUM_FEE = 500; // 5%
+
 	bytes4 private constant SELECTOR =
 		bytes4(keccak256(bytes("transfer(address,uint256)")));
 
@@ -33,6 +39,8 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		uint price1CumulativeLast;
 		uint kLast; // reserve0 * reserve1, as of immediately after the most recent liquidity event
 		uint unlocked;
+		uint minFee;
+		uint maxFee;
 	}
 	// keccak256(abi.encode(uint256(keccak256("gainz.Pair.storage")) - 1)) & ~bytes32(uint256(0xff));
 	bytes32 private constant PAIR_STORAGE_LOCATION =
@@ -64,6 +72,8 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		$.token0 = _token0;
 		$.token1 = _token1;
 		$.unlocked = 1;
+		$.minFee = MINIMUM_FEE;
+		$.maxFee = MAXIMUM_FEE;
 	}
 
 	// update reserves and, on the first call per block, price accumulators
@@ -151,7 +161,7 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		uint amount0 = balance0 - reserve0;
 		uint amount1 = balance1 - reserve1;
 
-		uint _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
+		uint _totalSupply = totalSupply();
 		if (_totalSupply == 0) {
 			liquidity = Math.sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
 			_mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
@@ -181,7 +191,7 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		uint balance1 = IERC20(_token1).balanceOf(address(this));
 		uint liquidity = balanceOf(address(this));
 
-		uint _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
+		uint _totalSupply = totalSupply();
 		amount0 = (liquidity * balance0) / _totalSupply; // using balances ensures pro-rata distribution
 		amount1 = (liquidity * balance1) / _totalSupply; // using balances ensures pro-rata distribution
 		require(
@@ -198,54 +208,114 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		emit Burn(msg.sender, amount0, amount1, to);
 	}
 
+	// if fee is on, mint liquidity equivalent to feePercent charged from the swap
+	function _mintSwapFee(
+		uint112 _reserve0,
+		uint112 _reserve1,
+		uint feePercent
+	) private returns (bool feeOn) {
+		PairStorage storage $ = _getPairStorage();
+
+		address feeTo = ISwapFactory($.router).feeTo();
+		feeOn = feeTo != address(0);
+		uint _kLast = $.kLast; // gas savings
+		if (feeOn) {
+			// We don't restrict to only when _kLast > 0 since all swaps generate fees
+			uint rootK = Math.sqrt(uint(_reserve0) * (_reserve1));
+			uint rootKLast = Math.sqrt(_kLast);
+			if (rootK > rootKLast) {
+				uint numerator = totalSupply() * (rootK - rootKLast);
+				uint denominator = (rootK * feePercent) + (rootKLast);
+				uint liquidity = numerator / denominator;
+				if (liquidity > 0) _mint(feeTo, liquidity);
+			}
+		} else if (_kLast != 0) {
+			$.kLast = 0;
+		}
+	}
+
+	struct SwapVariables {
+		uint balance0;
+		uint balance1;
+		address _token0;
+		address _token1;
+		uint feeAmount;
+		uint amountOut;
+		uint feePercent0;
+		uint feePercent1;
+		uint112 _reserve0;
+		uint112 _reserve1;
+	}
+
 	function swap(
 		uint amount0Out,
+		uint feePercent0,
 		uint amount1Out,
+		uint feePercent1,
 		address to
 	) external lock onlyOwner {
 		require(
 			amount0Out > 0 || amount1Out > 0,
 			"GainzSwap: INSUFFICIENT_OUTPUT_AMOUNT"
 		);
-		(uint112 _reserve0, uint112 _reserve1, ) = getReserves(); // gas savings
+		SwapVariables memory vars;
+
+		(vars._reserve0, vars._reserve1, ) = getReserves(); // gas savings
 		require(
-			amount0Out < _reserve0 && amount1Out < _reserve1,
+			amount0Out < vars._reserve0 && amount1Out < vars._reserve1,
 			"GainzSwap: INSUFFICIENT_LIQUIDITY"
 		);
 
-		uint balance0;
-		uint balance1;
-		{
-			PairStorage storage $ = _getPairStorage();
+		bool feeOn = _mintSwapFee(
+			vars._reserve0,
+			vars._reserve1,
+			feePercent0 + feePercent1
+		);
 
+		PairStorage storage $ = _getPairStorage();
+		{
 			// scope for _token{0,1}, avoids stack too deep errors
 			address _token0 = $.token0;
 			address _token1 = $.token1;
 			require(to != _token0 && to != _token1, "GainzSwap: INVALID_TO");
+
 			if (amount0Out > 0) _safeTransfer(_token0, to, amount0Out); // optimistically transfer tokens
 			if (amount1Out > 0) _safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
 
-			balance0 = IERC20(_token0).balanceOf(address(this));
-			balance1 = IERC20(_token1).balanceOf(address(this));
+			vars.balance0 = IERC20(_token0).balanceOf(address(this));
+			vars.balance1 = IERC20(_token1).balanceOf(address(this));
 		}
 
-		uint amount0In = balance0 > _reserve0 - amount0Out
-			? balance0 - (_reserve0 - amount0Out)
+		uint amount0In = vars.balance0 > vars._reserve0 - amount0Out
+			? vars.balance0 - (vars._reserve0 - amount0Out)
 			: 0;
-		uint amount1In = balance1 > _reserve1 - amount1Out
-			? balance1 - (_reserve1 - amount1Out)
+		uint amount1In = vars.balance1 > vars._reserve1 - amount1Out
+			? vars.balance1 - (vars._reserve1 - amount1Out)
 			: 0;
 		require(
 			amount0In > 0 || amount1In > 0,
 			"GainzSwap: INSUFFICIENT_INPUT_AMOUNT"
 		);
 
-		require(
-			balance0 * balance1 >= uint(_reserve0) * uint(_reserve1),
-			"GainzSwap: K"
-		);
+		{
+			uint balance0Adjusted = (vars.balance0 * FEE_BASIS_POINTS) -
+				(amount0In * feePercent0);
 
-		_update(balance0, balance1, _reserve0, _reserve1);
+			uint balance1Adjusted = (vars.balance1 * FEE_BASIS_POINTS) -
+				(amount1In * feePercent1);
+
+			require(
+				balance0Adjusted * balance1Adjusted >=
+					uint(vars._reserve0) *
+						uint(vars._reserve1) *
+						FEE_BASIS_POINTS ** 2,
+				"GainzSwap: K"
+			);
+		}
+
+		_update(vars.balance0, vars.balance1, vars._reserve0, vars._reserve1);
+		if (feeOn) $.kLast = uint($.reserve0) * ($.reserve1); // reserve0 and reserve1 are up-to-date
+
 		emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
 	}
 
@@ -257,6 +327,41 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 			IERC20($.token1).balanceOf(address(this)),
 			$.reserve0,
 			$.reserve1
+		);
+	}
+
+	function calculateFeePercent(
+		uint256 amount,
+		uint256 reserve
+	) public view returns (uint256 feePercent) {
+		(uint256 reserve0, uint256 reserve1, ) = getReserves();
+
+		require(
+			reserve == reserve0 || reserve == reserve1,
+			"GainzSwap: INVALID_RESERVE"
+		);
+
+		(uint256 minFeePercent, uint256 maxFeePercent) = feePercents();
+
+		uint256 totalLiquidty = totalSupply() -
+			balanceOf(ISwapFactory(_getPairStorage().router).feeTo());
+		uint256 liquidity = (amount * totalLiquidty) / reserve;
+
+		feePercent =
+			minFeePercent +
+			(liquidity * (maxFeePercent - minFeePercent)) /
+			totalLiquidty;
+
+		// Bounds the feePercent to the minFee and maxFee
+		return feePercent > maxFeePercent ? maxFeePercent : feePercent;
+	}
+
+	function feePercents() public view returns (uint256, uint256) {
+		PairStorage storage $ = _getPairStorage();
+
+		return (
+			$.minFee == 0 ? MINIMUM_FEE : $.minFee,
+			$.maxFee == 0 ? MAXIMUM_FEE : $.maxFee
 		);
 	}
 }

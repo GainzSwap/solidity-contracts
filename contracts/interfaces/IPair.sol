@@ -40,7 +40,13 @@ interface IPair {
 		address to
 	) external returns (uint256 amount0, uint256 amount1);
 
-	function swap(uint256 amount0Out, uint256 amount1Out, address to) external;
+	function swap(
+		uint amount0Out,
+		uint feeAmount0,
+		uint amount1Out,
+		uint feeAmount1,
+		address to
+	) external;
 
 	function sync() external;
 

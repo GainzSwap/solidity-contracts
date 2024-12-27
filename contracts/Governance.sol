@@ -125,7 +125,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 				path,
 				address(this),
 				block.timestamp + 1
-			)[path.length - 1];
+			)[path.length - 1][0];
 	}
 
 	function _receiveAndApprovePayment(

@@ -28,11 +28,11 @@ library AMMLibrary {
 		address pairsBeacon,
 		address tokenA,
 		address tokenB
-	) internal view returns (uint reserveA, uint reserveB) {
+	) internal view returns (uint reserveA, uint reserveB, address pair) {
+		pair = pairFor(router, pairsBeacon, tokenA, tokenB);
+
 		(address token0, ) = sortTokens(tokenA, tokenB);
-		(uint reserve0, uint reserve1, ) = IPair(
-			pairFor(router, pairsBeacon, tokenA, tokenB)
-		).getReserves();
+		(uint reserve0, uint reserve1, ) = IPair(pair).getReserves();
 		(reserveA, reserveB) = tokenA == token0
 			? (reserve0, reserve1)
 			: (reserve1, reserve0);
@@ -56,32 +56,41 @@ library AMMLibrary {
 	function getAmountOut(
 		uint amountIn,
 		uint reserveIn,
-		uint reserveOut
-	) internal pure returns (uint amountOut) {
+		uint reserveOut,
+		address pair
+	) internal view returns (uint[2] memory feeData) {
 		require(amountIn > 0, "AMMLibrary: INSUFFICIENT_INPUT_AMOUNT");
 		require(
 			reserveIn > 0 && reserveOut > 0,
 			"AMMLibrary: INSUFFICIENT_LIQUIDITY"
 		);
-		uint numerator = amountIn * reserveOut;
-		uint denominator = reserveIn + amountIn;
-		amountOut = numerator / denominator;
+
+		feeData[1] = Pair(pair).calculateFeePercent(amountIn, reserveIn);
+
+		uint amountInWithFee = amountIn * (100_00 - feeData[1]);
+		uint numerator = amountInWithFee * reserveOut;
+		uint denominator = (reserveIn * 100_00) + amountInWithFee;
+		feeData[0] = numerator / denominator;
 	}
 
 	// given an output amount of an asset and pair reserves, returns a required input amount of the other asset
 	function getAmountIn(
 		uint amountOut,
 		uint reserveIn,
-		uint reserveOut
-	) internal pure returns (uint amountIn) {
+		uint reserveOut,
+		address pair
+	) internal view returns (uint[2] memory feeData) {
 		require(amountOut > 0, "AMMLibrary: INSUFFICIENT_OUTPUT_AMOUNT");
 		require(
 			reserveIn > 0 && reserveOut > 0,
 			"AMMLibrary: INSUFFICIENT_LIQUIDITY"
 		);
-		uint numerator = reserveIn * amountOut;
-		uint denominator = reserveOut - amountOut;
-		amountIn = (numerator / denominator) + 1;
+
+		feeData[1] = Pair(pair).calculateFeePercent(amountOut, reserveOut);
+
+		uint numerator = reserveIn * amountOut * 100_00;
+		uint denominator = (reserveOut - amountOut) * (100_00 - feeData[1]);
+		feeData[0] = (numerator / denominator) + 1;
 	}
 
 	// performs chained getAmountOut calculations on any number of pairs
@@ -90,19 +99,25 @@ library AMMLibrary {
 		address pairsBeacon,
 		uint amountIn,
 		address[] memory path
-	) external view returns (uint[] memory amounts) {
+	) external view returns (uint[2][] memory amounts) {
 		if (path.length < 2) revert Errors.InvalidPath(path);
 
-		amounts = new uint[](path.length);
-		amounts[0] = amountIn;
+		amounts = new uint[2][](path.length);
+		amounts[0][0] = amountIn;
 		for (uint i; i < path.length - 1; i++) {
-			(uint reserveIn, uint reserveOut) = getReserves(
+			(uint reserveIn, uint reserveOut, address pair) = getReserves(
 				router,
 				pairsBeacon,
 				path[i],
 				path[i + 1]
 			);
-			amounts[i + 1] = getAmountOut(amounts[i], reserveIn, reserveOut);
+
+			amounts[i + 1] = getAmountOut(
+				amounts[i][0],
+				reserveIn,
+				reserveOut,
+				pair
+			);
 		}
 	}
 
@@ -112,18 +127,23 @@ library AMMLibrary {
 		address pairsBeacon,
 		uint amountOut,
 		address[] memory path
-	) external view returns (uint[] memory amounts) {
+	) external view returns (uint[2][] memory amounts) {
 		require(path.length >= 2, "AMMLibrary: INVALID_PATH");
-		amounts = new uint[](path.length);
-		amounts[amounts.length - 1] = amountOut;
+		amounts = new uint[2][](path.length);
+		amounts[amounts.length - 1][0] = amountOut;
 		for (uint i = path.length - 1; i > 0; i--) {
-			(uint reserveIn, uint reserveOut) = getReserves(
+			(uint reserveIn, uint reserveOut, address pair) = getReserves(
 				router,
 				pairsBeacon,
 				path[i - 1],
 				path[i]
 			);
-			amounts[i - 1] = getAmountIn(amounts[i], reserveIn, reserveOut);
+			amounts[i - 1] = getAmountIn(
+				amounts[i][0],
+				reserveIn,
+				reserveOut,
+				pair
+			);
 		}
 	}
 

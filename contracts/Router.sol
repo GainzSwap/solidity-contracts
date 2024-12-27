@@ -31,6 +31,44 @@ import "./errors.sol";
 
 library RouterLib {
 	using TokenPayments for TokenPayment;
+	using TokenPayments for address;
+
+	// requires the initial amount to have already been sent to the first pair
+	function _swap(
+		uint[2][] memory amounts,
+		address[] memory path,
+		address _to,
+		address pairsBeacon
+	) internal {
+		for (uint i; i < path.length - 1; i++) {
+			(address input, address output) = (path[i], path[i + 1]);
+			uint amount0Out;
+			uint feeAmount0;
+			uint amount1Out;
+			uint feeAmount1;
+
+			{
+				(address token0, ) = AMMLibrary.sortTokens(input, output);
+				uint amountOut = amounts[i + 1][0];
+				uint feeAmount = amounts[i + 1][1];
+				(amount0Out, feeAmount0, amount1Out, feeAmount1) = input ==
+					token0
+					? (uint(0), uint(0), amountOut, feeAmount)
+					: (amountOut, feeAmount, uint(0), uint(0));
+			}
+
+			address to = i < path.length - 2
+				? AMMLibrary.pairFor(
+					address(this),
+					pairsBeacon,
+					output,
+					path[i + 2]
+				)
+				: _to;
+			IPair(AMMLibrary.pairFor(address(this), pairsBeacon, input, output))
+				.swap(amount0Out, feeAmount0, amount1Out, feeAmount1, to);
+		}
+	}
 
 	function _addLiquidity(
 		address tokenA,
@@ -113,6 +151,64 @@ library RouterLib {
 
 		liquidity = _mintLiquidity(paymentA, paymentB, pair, wNativeToken);
 	}
+
+	function swapExactTokensForTokens(
+		uint amountIn,
+		uint amountOutMin,
+		address[] calldata path,
+		address to,
+		address _originalCaller,
+		address wNtvAddr,
+		address governance,
+		address pairsBeacon
+	) external returns (uint[2][] memory amounts) {
+		amounts = AMMLibrary.getAmountsOut(
+			address(this),
+			pairsBeacon,
+			amountIn,
+			path
+		);
+		require(
+			amounts[amounts.length - 1][0] >= amountOutMin,
+			"Router: INSUFFICIENT_OUTPUT_AMOUNT"
+		);
+
+		{
+			// Send token scope
+			address pair = AMMLibrary.pairFor(
+				address(this),
+				pairsBeacon,
+				path[0],
+				path[1]
+			);
+			if (msg.value > 0) {
+				require(
+					msg.value == amountIn,
+					"Router: INVALID_AMOUNT_IN_VALUES"
+				);
+				require(path[0] == wNtvAddr, "Router: INVALID_PATH");
+				WNTV(wNtvAddr).receiveFor{ value: msg.value }(pair);
+			} else {
+				TransferHelper.safeTransferFrom(
+					path[0],
+					_originalCaller == address(0)
+						? msg.sender
+						: _originalCaller,
+					pair,
+					amounts[0][0]
+				);
+			}
+		}
+
+		// Swap and prepare to unWrap Native if needed
+		bool autoUnwrap = to != governance && path[path.length - 1] == wNtvAddr;
+		_swap(amounts, path, autoUnwrap ? address(this) : to, pairsBeacon);
+		if (autoUnwrap)
+			path[path.length - 1].sendFungibleToken(
+				amounts[path.length - 1][0],
+				to
+			);
+	}
 }
 
 contract Router is
@@ -123,7 +219,6 @@ contract Router is
 	Errors
 {
 	using TokenPayments for TokenPayment;
-	using TokenPayments for address;
 	using Epochs for Epochs.Storage;
 
 	/// @custom:storage-location erc7201:gainz.Router.storage
@@ -284,38 +379,6 @@ contract Router is
 		}
 	}
 
-	// requires the initial amount to have already been sent to the first pair
-	function _swap(
-		uint[] memory amounts,
-		address[] memory path,
-		address _to
-	) internal virtual {
-		for (uint i; i < path.length - 1; i++) {
-			(address input, address output) = (path[i], path[i + 1]);
-			(address token0, ) = AMMLibrary.sortTokens(input, output);
-			uint amountOut = amounts[i + 1];
-			(uint amount0Out, uint amount1Out) = input == token0
-				? (uint(0), amountOut)
-				: (amountOut, uint(0));
-			address to = i < path.length - 2
-				? AMMLibrary.pairFor(
-					address(this),
-					getPairsBeacon(),
-					output,
-					path[i + 2]
-				)
-				: _to;
-			IPair(
-				AMMLibrary.pairFor(
-					address(this),
-					getPairsBeacon(),
-					input,
-					output
-				)
-			).swap(amount0Out, amount1Out, to);
-		}
-	}
-
 	function swapExactTokensForTokens(
 		uint amountIn,
 		uint amountOutMin,
@@ -327,59 +390,18 @@ contract Router is
 		payable
 		virtual
 		ensure(deadline)
-		returns (uint[] memory amounts)
+		returns (uint[2][] memory amounts)
 	{
-		amounts = AMMLibrary.getAmountsOut(
-			address(this),
-			getPairsBeacon(),
-			amountIn,
-			path
-		);
-		require(
-			amounts[amounts.length - 1] >= amountOutMin,
-			"Router: INSUFFICIENT_OUTPUT_AMOUNT"
-		);
-
-		WNTV wNtv = WNTV(getWrappedNativeToken());
-
-		{
-			// Send token scope
-			address pair = AMMLibrary.pairFor(
-				address(this),
-				getPairsBeacon(),
-				path[0],
-				path[1]
-			);
-			if (msg.value > 0) {
-				require(
-					msg.value == amountIn,
-					"Router: INVALID_AMOUNT_IN_VALUES"
-				);
-				require(
-					path[0] == getWrappedNativeToken(),
-					"Router: INVALID_PATH"
-				);
-				wNtv.receiveFor{ value: msg.value }(pair);
-			} else {
-				TransferHelper.safeTransferFrom(
-					path[0],
-					_originalCaller == address(0)
-						? msg.sender
-						: _originalCaller,
-					pair,
-					amounts[0]
-				);
-			}
-		}
-
-		// Swap and prepare to unWrap Native if needed
-		bool autoUnwrap = to != _getRouterStorage().governance &&
-			path[path.length - 1] == address(wNtv);
-		_swap(amounts, path, autoUnwrap ? address(this) : to);
-		if (autoUnwrap)
-			path[path.length - 1].sendFungibleToken(
-				amounts[path.length - 1],
-				to
+		return
+			RouterLib.swapExactTokensForTokens(
+				amountIn,
+				amountOutMin,
+				path,
+				to,
+				_originalCaller,
+				getWrappedNativeToken(),
+				_getRouterStorage().governance,
+				getPairsBeacon()
 			);
 	}
 

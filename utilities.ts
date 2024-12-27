@@ -15,7 +15,6 @@ export async function getRouterLibraries(ethers: typeof e) {
     OracleLibrary: govLibs.OracleLibrary,
     DeployWNTV: await (await ethers.deployContract("DeployWNTV")).getAddress(),
     RouterLib: await (await ethers.deployContract("RouterLib", { libraries: { AMMLibrary } })).getAddress(),
-    AMMLibrary,
     UserModuleLib: await (await ethers.deployContract("UserModuleLib")).getAddress(),
     DeployPriceOracle: await (await ethers.deployContract("DeployPriceOracle")).getAddress(),
     DeployGovernance: await (

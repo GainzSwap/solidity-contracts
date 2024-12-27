@@ -6,6 +6,8 @@ import { Pair } from "../Pair.sol";
 import { TestERC20 } from "./TestERC20.sol";
 import { AMMLibrary } from "../libraries/AMMLibrary.sol";
 
+import "forge-std/console.sol";
+
 contract PairTest is Test {
 	Pair pair;
 	TestERC20 token0;
@@ -27,40 +29,88 @@ contract PairTest is Test {
 		pair.mint(address(this));
 	}
 
+	function feeTo() public pure returns (address) {
+		return 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
+	}
+
 	function testFuzz_swap(bool isToken0In, uint256 amountIn) public {
-		uint256 amount0Out = 0;
-		uint256 amount1Out = 0;
+		uint256[2] memory feeData0;
+		uint256[2] memory feeData1;
 		// Random address for the swap
-		address to = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
+		address swapReceiver = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
+		(uint256 reserve0, uint256 reserve1, ) = pair.getReserves();
 
 		// Ensure the amounts are within a reasonable range
-		amountIn = bound(amountIn, 0.000_001 ether, 1000 ether);
-
-		// Mint tokens to the Pair contract
-		(uint256 reserve0, uint256 reserve1, ) = pair.getReserves();
+		amountIn = bound(
+			amountIn,
+			10_000 wei,
+			(isToken0In ? reserve0 : reserve1) * 1_000
+		);
 
 		if (isToken0In) {
 			token0.mint(address(pair), amountIn);
-			amount1Out = AMMLibrary.getAmountOut(amountIn, reserve0, reserve1);
+			feeData1 = AMMLibrary.getAmountOut(
+				amountIn,
+				reserve0,
+				reserve1,
+				address(pair)
+			);
 		} else {
 			token1.mint(address(pair), amountIn);
-			amount0Out = AMMLibrary.getAmountOut(amountIn, reserve1, reserve0);
+			feeData0 = AMMLibrary.getAmountOut(
+				amountIn,
+				reserve1,
+				reserve0,
+				address(pair)
+			);
 		}
 
 		// Call the swap function
-		pair.swap(amount0Out, amount1Out, to);
+		pair.swap(
+			feeData0[0],
+			feeData0[1],
+			feeData1[0],
+			feeData1[1],
+			swapReceiver
+		);
 
 		// Check the reserves
 		(uint256 reserve0Final, uint256 reserve1Final, ) = pair.getReserves();
 
-		if (isToken0In) {
-			assert(token1.balanceOf(to) == amount1Out);
-			assert(reserve0Final == reserve0 + amountIn);
-			assert(reserve1Final == reserve1 - amount1Out);
-		} else {
-			assert(token0.balanceOf(to) == amount0Out);
-			assert(reserve0Final == reserve0 - amount0Out);
-			assert(reserve1Final == reserve1 + amountIn);
-		}
+		(
+			uint256 receiverBalance,
+			uint256 reserveInDelta,
+			uint256 amountOut
+		) = isToken0In
+				? (
+					token1.balanceOf(swapReceiver),
+					reserve0 + amountIn,
+					feeData1[0]
+				)
+				: (
+					token0.balanceOf(swapReceiver),
+					reserve1 + amountIn,
+					feeData0[0]
+				);
+		uint256 reserveOutDelta = (isToken0In ? reserve1 : reserve0) -
+			amountOut;
+
+		assertEq(receiverBalance, amountOut, "Balance Error");
+		assertEq(
+			reserveInDelta,
+			isToken0In ? reserve0Final : reserve1Final,
+			"reserveInDelta Error"
+		);
+		assertEq(
+			reserveOutDelta,
+			isToken0In ? reserve1Final : reserve0Final,
+			"ReserveOutDelta Error"
+		);
+
+		// Mints fee Liquidity
+		assertTrue(
+			pair.balanceOf(feeTo()) > 0,
+			"Fee Collector should receive fee in liquidity"
+		);
 	}
 }

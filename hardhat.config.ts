@@ -15,12 +15,12 @@ import "@openzeppelin/hardhat-upgrades";
 import "./scripts/createInitialPairs";
 import "./scripts/distributeRewards";
 import "./scripts/upgradeGovernance";
-import "./scripts/upgradeToMainnet";
 import "./scripts/upgradeRouter";
 import "./scripts/moveTime";
 import './scripts/updateStartBlock'
 import "./scripts/upgradePairs";
 import "./scripts/runE2ELocalnet";
+import "./scripts/deployNewViews";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey =
@@ -39,7 +39,7 @@ const config: HardhatUserConfig = {
       },
     },
   },
-  defaultNetwork: "hardhat",
+  defaultNetwork: "localhost",
   namedAccounts: {
     deployer: {
       // By default, it will take the first Hardhat account as the deployer
