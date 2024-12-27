@@ -6,24 +6,13 @@ import { Governance } from "../Governance.sol";
 import { Router } from "../Router.sol";
 import { TokenPayment, TokenPayments } from "../libraries/TokenPayments.sol";
 import { Epochs } from "../libraries/Epochs.sol";
-import { Gainz } from "../tokens/Gainz/Gainz.sol";
-import { WNTV } from "../tokens/WNTV.sol";
 import { ERC1155Holder } from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import { RouterFixture, Gainz, WNTV } from "./shared/RouterFixture.sol";
 
-contract GovernanceTest is Test, ERC1155Holder {
+contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 	Governance governance;
-	Router router;
-	Gainz gainz;
-	WNTV wNative;
 
 	function setUp() public {
-		gainz = new Gainz();
-		gainz.initialize();
-
-		router = new Router();
-		router.initialize(address(this));
-		router.runInit(address(gainz));
-
 		governance = Governance(payable(router.getGovernance()));
 		wNative = WNTV(payable(router.getWrappedNativeToken()));
 
@@ -48,7 +37,9 @@ contract GovernanceTest is Test, ERC1155Holder {
 	}
 
 	function testFuzz_stake(uint256 amount) public {
-		vm.assume(1e-15 ether <= amount && amount <= gainz.balanceOf(address(this)));
+		vm.assume(
+			1e-15 ether <= amount && amount <= gainz.balanceOf(address(this))
+		);
 
 		TokenPayment memory payment = TokenPayment({
 			nonce: 0,

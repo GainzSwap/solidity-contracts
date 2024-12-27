@@ -17,7 +17,7 @@ import "./scripts/distributeRewards";
 import "./scripts/upgradeGovernance";
 import "./scripts/upgradeRouter";
 import "./scripts/moveTime";
-import './scripts/updateStartBlock'
+import "./scripts/updateStartBlock";
 import "./scripts/upgradePairs";
 import "./scripts/runE2ELocalnet";
 import "./scripts/deployNewViews";

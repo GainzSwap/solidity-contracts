@@ -237,14 +237,8 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 	struct SwapVariables {
 		uint balance0;
 		uint balance1;
-		address _token0;
-		address _token1;
-		uint feeAmount;
-		uint amountOut;
-		uint feePercent0;
-		uint feePercent1;
-		uint112 _reserve0;
-		uint112 _reserve1;
+		uint112 reserve0;
+		uint112 reserve1;
 	}
 
 	function swap(
@@ -258,39 +252,39 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 			amount0Out > 0 || amount1Out > 0,
 			"GainzSwap: INSUFFICIENT_OUTPUT_AMOUNT"
 		);
-		SwapVariables memory vars;
 
-		(vars._reserve0, vars._reserve1, ) = getReserves(); // gas savings
+		SwapVariables memory swapVars;
+
+		(swapVars.reserve0, swapVars.reserve1, ) = getReserves(); // gas savings
 		require(
-			amount0Out < vars._reserve0 && amount1Out < vars._reserve1,
+			amount0Out < swapVars.reserve0 && amount1Out < swapVars.reserve1,
 			"GainzSwap: INSUFFICIENT_LIQUIDITY"
 		);
 
 		bool feeOn = _mintSwapFee(
-			vars._reserve0,
-			vars._reserve1,
+			swapVars.reserve0,
+			swapVars.reserve1,
 			feePercent0 + feePercent1
 		);
 
 		PairStorage storage $ = _getPairStorage();
+
 		{
-			// scope for _token{0,1}, avoids stack too deep errors
-			address _token0 = $.token0;
-			address _token1 = $.token1;
-			require(to != _token0 && to != _token1, "GainzSwap: INVALID_TO");
+			// scope for $.token{0,1}, avoids stack too deep errors
+			require(to != $.token0 && to != $.token1, "GainzSwap: INVALID_TO");
 
-			if (amount0Out > 0) _safeTransfer(_token0, to, amount0Out); // optimistically transfer tokens
-			if (amount1Out > 0) _safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
+			if (amount0Out > 0) _safeTransfer($.token0, to, amount0Out); // optimistically transfer tokens
+			if (amount1Out > 0) _safeTransfer($.token1, to, amount1Out); // optimistically transfer tokens
 
-			vars.balance0 = IERC20(_token0).balanceOf(address(this));
-			vars.balance1 = IERC20(_token1).balanceOf(address(this));
+			swapVars.balance0 = IERC20($.token0).balanceOf(address(this));
+			swapVars.balance1 = IERC20($.token1).balanceOf(address(this));
 		}
 
-		uint amount0In = vars.balance0 > vars._reserve0 - amount0Out
-			? vars.balance0 - (vars._reserve0 - amount0Out)
+		uint amount0In = swapVars.balance0 > swapVars.reserve0 - amount0Out
+			? swapVars.balance0 - (swapVars.reserve0 - amount0Out)
 			: 0;
-		uint amount1In = vars.balance1 > vars._reserve1 - amount1Out
-			? vars.balance1 - (vars._reserve1 - amount1Out)
+		uint amount1In = swapVars.balance1 > swapVars.reserve1 - amount1Out
+			? swapVars.balance1 - (swapVars.reserve1 - amount1Out)
 			: 0;
 		require(
 			amount0In > 0 || amount1In > 0,
@@ -298,22 +292,27 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		);
 
 		{
-			uint balance0Adjusted = (vars.balance0 * FEE_BASIS_POINTS) -
+			uint balance0Adjusted = (swapVars.balance0 * FEE_BASIS_POINTS) -
 				(amount0In * feePercent0);
 
-			uint balance1Adjusted = (vars.balance1 * FEE_BASIS_POINTS) -
+			uint balance1Adjusted = (swapVars.balance1 * FEE_BASIS_POINTS) -
 				(amount1In * feePercent1);
 
 			require(
 				balance0Adjusted * balance1Adjusted >=
-					uint(vars._reserve0) *
-						uint(vars._reserve1) *
+					uint(swapVars.reserve0) *
+						uint(swapVars.reserve1) *
 						FEE_BASIS_POINTS ** 2,
 				"GainzSwap: K"
 			);
 		}
 
-		_update(vars.balance0, vars.balance1, vars._reserve0, vars._reserve1);
+		_update(
+			swapVars.balance0,
+			swapVars.balance1,
+			swapVars.reserve0,
+			swapVars.reserve1
+		);
 		if (feeOn) $.kLast = uint($.reserve0) * ($.reserve1); // reserve0 and reserve1 are up-to-date
 
 		emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);

@@ -12,6 +12,7 @@ import { OracleLibrary } from "./libraries/OracleLibrary.sol";
 import { FixedPoint128 } from "./libraries/FixedPoint128.sol";
 import { FullMath } from "./libraries/FullMath.sol";
 import { Epochs } from "./libraries/Epochs.sol";
+import { DeployGToken } from "./libraries/DeployGToken.sol";
 
 import { GToken, GTokenLib } from "./tokens/GToken/GToken.sol";
 
@@ -21,27 +22,6 @@ import { PriceOracle } from "./PriceOracle.sol";
 
 import "./types.sol";
 import "./errors.sol";
-
-library DeployGToken {
-	function create(
-		Epochs.Storage memory epochs,
-		address initialOwner,
-		address proxyAdmin
-	) external returns (address) {
-		return
-			address(
-				new TransparentUpgradeableProxy(
-					address(new GToken()),
-					proxyAdmin,
-					abi.encodeWithSelector(
-						GToken.initialize.selector,
-						epochs,
-						initialOwner
-					)
-				)
-			);
-	}
-}
 
 /// @title Governance Contract
 /// @notice This contract handles the governance process by allowing users to lock LP tokens and mint GTokens.
@@ -59,7 +39,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		// The following values should be immutable
 		address gtoken;
 		address gainzToken;
-		 address router;
+		address router;
 		address wNativeToken;
 		Epochs.Storage epochs;
 	}
@@ -119,13 +99,14 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		payment.token = path[path.length - 1];
 		payment.amount = payment.token == stakingPayment.token
 			? amountIn
-			: Router(payable(_getGovernanceStorage().router)).swapExactTokensForTokens(
-				amountIn,
-				amountOutMin,
-				path,
-				address(this),
-				block.timestamp + 1
-			)[path.length - 1][0];
+			: Router(payable(_getGovernanceStorage().router))
+				.swapExactTokensForTokens(
+					amountIn,
+					amountOutMin,
+					path,
+					address(this),
+					block.timestamp + 1
+				)[path.length - 1][0];
 	}
 
 	function _receiveAndApprovePayment(
@@ -354,15 +335,16 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 		// Transfer LP tokens back to the user
 		pair.approve($.router, liquidityToReturn);
-		(uint256 amount0, uint256 amount1) = Router(payable($.router)).removeLiquidity(
-			attributes.lpDetails.token0,
-			attributes.lpDetails.token1,
-			liquidityToReturn,
-			amount0Min,
-			amount1Min,
-			address(this),
-			block.timestamp + 1
-		);
+		(uint256 amount0, uint256 amount1) = Router(payable($.router))
+			.removeLiquidity(
+				attributes.lpDetails.token0,
+				attributes.lpDetails.token1,
+				liquidityToReturn,
+				amount0Min,
+				amount1Min,
+				address(this),
+				block.timestamp + 1
+			);
 
 		// Set these values to 0 and updating the atttributes at nonce effectively burns the token
 		attributes.lpDetails.liquidity = 0;

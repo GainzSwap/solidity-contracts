@@ -29,8 +29,7 @@ export async function routerFixture() {
     libraries: routerLibs,
   });
   const router = await RouterFactory.deploy();
-  await router.initialize(owner);
-  await router.runInit(gainzToken);
+  await router.initialize(owner, gainzToken);
 
   const wrappedNativeToken = await router.getWrappedNativeToken();
   const routerAddress = await router.getAddress();

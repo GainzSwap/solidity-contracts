@@ -170,9 +170,7 @@ contract GToken is SFT {
 		address user
 	) public view returns (GTokenBalance[] memory) {
 		SftBalance[] memory _sftBals = _sftBalance(user);
-		GTokenBalance[] memory balance = new GTokenBalance[](
-			_sftBals.length
-		);
+		GTokenBalance[] memory balance = new GTokenBalance[](_sftBals.length);
 
 		for (uint256 i = 0; i < _sftBals.length; i++) {
 			SftBalance memory _sftBal = _sftBals[i];

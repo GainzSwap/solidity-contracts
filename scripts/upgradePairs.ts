@@ -10,13 +10,12 @@ task("upgradePairs", "Upgrades all pairs, remember to edit script with new facto
   const router = await hre.ethers.getContract<Router>("Router", deployer);
 
   const pairBeaconAddress = await router.getPairsBeacon();
-  
+
   // Get contract factories for the new implementations
   const pairFactory = () => hre.ethers.getContractFactory("Pair");
 
   console.log("Force importing Pair beacon...");
   const pairBeacon = await hre.upgrades.forceImport(pairBeaconAddress, await pairFactory());
-
 
   // Upgrade the Beacon with the new implementation of Pair
   console.log("Upgrading Pair beacon...");
@@ -30,6 +29,4 @@ task("upgradePairs", "Upgrades all pairs, remember to edit script with new facto
 
   // Run any additional tasks, such as generating TypeScript ABIs
   await hre.deployments.run("generateTsAbis");
-
-
 });

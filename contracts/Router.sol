@@ -258,14 +258,13 @@ contract Router is
 
 	// **** INITIALIZATION ****
 
-	function initialize(address initialOwner) public initializer {
+	function initialize(
+		address initialOwner,
+		address gainzToken
+	) public initializer {
 		__Ownable_init(initialOwner);
-	}
 
-	function runInit(address gainzToken) public onlyOwner {
 		RouterStorage storage $ = _getRouterStorage();
-
-		require($.proxyAdmin == address(0), "already initialised");
 
 		$.feeToSetter = $.feeTo = owner();
 		$.proxyAdmin = msg.sender;
@@ -278,14 +277,6 @@ contract Router is
 
 		// set Wrapped Native Token;
 		$.wNativeToken = DeployWNTV.create($.proxyAdmin);
-
-		_setGovernance(gainzToken);
-		setPriceOracle();
-	}
-
-	function _setGovernance(address gainzToken) internal {
-		RouterStorage storage $ = _getRouterStorage();
-
 		$.governance = DeployGovernance.create(
 			$.epochs,
 			gainzToken,

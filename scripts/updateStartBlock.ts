@@ -3,9 +3,8 @@ import { task } from "hardhat/config";
 import { Gainz, Router } from "../typechain-types";
 import { getDeploymentTxHashFromNetwork } from "../utilities";
 
-
 task("updateStartBlock", "")
-  .addParam("startBlock")
+  .addParam("startBlock", undefined, "0")
   .setAction(async ({ startBlock }, hre) => {
     const { ethers } = hre;
     const { deployer } = await hre.getNamedAccounts();

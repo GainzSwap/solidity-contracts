@@ -14,8 +14,8 @@ abstract contract RouterFixture {
 		gainz.initialize();
 
 		router = new Router();
-		router.initialize(address(this));
-		router.runInit(address(gainz));
+		router.initialize(address(this), address(gainz));
+		router.setPriceOracle();
 
 		wNative = WNTV(payable(router.getWrappedNativeToken()));
 	}

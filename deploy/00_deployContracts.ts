@@ -15,12 +15,11 @@ const deployRouterContract: DeployFunction = async function (hre: HardhatRuntime
     libraries: await getRouterLibraries(ethers),
   });
   const gainzAddress = await gainzToken.getAddress();
-  const router = await upgrades.deployProxy(Router, [deployer], {
+  const router = await upgrades.deployProxy(Router, [deployer, gainzAddress], {
     unsafeAllow: ["external-library-linking"],
   });
   await router.waitForDeployment();
-
-  await router.runInit(gainzAddress);
+  await router.setPriceOracle();
 
   const routerAddress = await router.getAddress();
 
