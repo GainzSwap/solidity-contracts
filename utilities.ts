@@ -1,9 +1,13 @@
 import { ethers as e } from "hardhat";
 
 export async function getGovernanceLibraries(ethers: typeof e) {
+  const OracleLibrary = await (await ethers.deployContract("OracleLibrary")).getAddress();
+
   return {
+    DeployLaunchPair: await (await ethers.deployContract("DeployLaunchPair")).getAddress(),
+    GovernanceLib: await (await ethers.deployContract("GovernanceLib", { libraries: { OracleLibrary } })).getAddress(),
     DeployGToken: await (await ethers.deployContract("DeployGToken")).getAddress(),
-    OracleLibrary: await (await ethers.deployContract("OracleLibrary")).getAddress(),
+    OracleLibrary,
   };
 }
 

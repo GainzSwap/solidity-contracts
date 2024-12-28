@@ -113,4 +113,21 @@ contract PairTest is Test {
 			"Fee Collector should receive fee in liquidity"
 		);
 	}
+
+	function testFuzz_mint(uint amount0, uint amount1) public {
+		(uint reserve0, uint reserve1, ) = pair.getReserves();
+
+		amount0 = bound(amount0, reserve0 / 100, reserve0);
+		amount1 = bound(amount1, reserve1 / 100, reserve1);
+
+		token0.mint(address(pair), amount0);
+		token1.mint(address(pair), amount1);
+
+		pair.mint(address(this));
+
+		token0.mint(address(pair), amount0 / 10);
+		token1.mint(address(pair), amount1 * 100);
+
+		pair.mint(address(this));
+	}
 }

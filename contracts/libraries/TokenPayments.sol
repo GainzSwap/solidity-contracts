@@ -18,6 +18,17 @@ struct TokenPayment {
 library TokenPayments {
 	using Address for address;
 
+	function receiveSFT(TokenPayment memory payment) internal {
+		// SFT payment
+		SFT(payment.token).safeTransferFrom(
+			msg.sender,
+			address(this),
+			payment.nonce,
+			payment.amount,
+			""
+		);
+	}
+
 	function receiveTokenFor(
 		TokenPayment memory payment,
 		address from,

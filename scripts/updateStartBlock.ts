@@ -22,11 +22,13 @@ task("updateStartBlock", "")
     const governance = await hre.ethers.getContractAt("Governance", governanceAdr);
     const gTokenAddr = await governance.getGToken();
 
+    // These contracts will be indexed on our graph
     const artifactsToSave = [
       ["Gainz", await gainz.getAddress()],
       ["Governance", governanceAdr],
       ["GToken", gTokenAddr],
       ["Router", routerAddress],
+      ["LaunchPair", await governance.launchPair()],
     ];
 
     const { save, getExtendedArtifact } = hre.deployments;

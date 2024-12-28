@@ -1,9 +1,10 @@
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
-import { routerFixture } from "./shared/fixtures";
+import { claimRewardsFixture, routerFixture } from "./shared/fixtures";
 import { expect } from "chai";
-import { Addressable, AddressLike, parseEther, ZeroAddress } from "ethers";
+import { Addressable, AddressLike, BigNumberish, parseEther, ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 import { getPairProxyAddress } from "./shared/utilities";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("Governance", function () {
   it("deploys governance", async () => {
@@ -404,17 +405,17 @@ describe("Governance", function () {
     //   const initialAttributes = await governance.getUserAttributes(user.address, 0);
 
     //   // Unstake without minimum amounts
-    //   await governance.connect(user).unStake(0, 0, 0);
+    //   await governance.connect(user).unstake( 0, 0);
 
     //   const finalAttributes = await governance.getUserAttributes(user.address, 0);
 
     //   // Check that the liquidity in user attributes is now zero
-    //   expect(finalAttributes.lpDetails.liquidity).to.equal(0);
+    //   expect(finalAttributes.gTokenDetails.liquidity).to.equal(0);
     // });
 
     // it("should burn the GToken upon unstaking", async function () {
     //   // Unstake to trigger GToken burn
-    //   await governance.connect(user).unStake(0, 0, 0);
+    //   await governance.connect(user).unstake( 0, 0);
 
     //   // Check that GToken balance for the user is zero
     //   const gTokenBalance = await governance.getGTokenBalance(user.address, 0);
@@ -425,7 +426,7 @@ describe("Governance", function () {
     //   // Attempt to unstake when there are no rewards to claim
     //   const userInitialBalance = await gainzToken.balanceOf(user.address);
 
-    //   await governance.connect(user).unStake(0, 0, 0);
+    //   await governance.connect(user).unstake( 0, 0);
 
     //   const userFinalBalance = await gainzToken.balanceOf(user.address);
     //   expect(userFinalBalance).to.equal(userInitialBalance);
@@ -436,7 +437,383 @@ describe("Governance", function () {
     //   const amount0Min = ethers.utils.parseEther("200");
     //   const amount1Min = ethers.utils.parseEther("200");
 
-    //   await expect(governance.connect(user).unStake(0, amount0Min, amount1Min)).to.be.revertedWith("SlippageExceeded");
+    //   await expect(governance.connect(user).unstake( amount0Min, amount1Min)).to.be.revertedWith("SlippageExceeded");
     // });
+  });
+
+  async function proposeNewPairListingFixture() {
+    const {
+      owner,
+      governance,
+      gToken,
+      users: [pairOwner, ...otherUsers],
+      gainzToken: listingFeeToken,
+      gainzNativePair,
+      stake,
+      LISTING_FEE,
+      ...fixtures
+    } = await claimRewardsFixture();
+
+    const proposeNewPairListing = async () => {
+      const tradeToken = await ethers.deployContract("TestERC20", ["NewPairTrade", "TRKJ", 18], { signer: pairOwner });
+
+      // Prepare listing fee payment and GToken payment
+      const listingFeePayment = {
+        token: listingFeeToken,
+        amount: LISTING_FEE,
+        nonce: 0,
+      };
+      // Approve the listing fee payment
+      await listingFeeToken.mint(pairOwner, listingFeePayment.amount);
+      await listingFeeToken.connect(pairOwner).approve(governance, listingFeePayment.amount);
+
+      const tradeTokenPayment = {
+        token: tradeToken,
+        amount: parseEther("123455"),
+        nonce: 0,
+      };
+      // Approve the listing fee payment
+      await tradeToken.mint(pairOwner, tradeTokenPayment.amount);
+      await tradeToken.connect(pairOwner).approve(governance, tradeTokenPayment.amount);
+
+      // Enter governance to create GToken balance
+      const gTokenBalance = (await stake(pairOwner, { amount: { nativeAmount: parseEther("2000") } })).at(-1)!;
+      const securityGTokenPayment = {
+        token: gToken,
+        amount: gTokenBalance.amount,
+        nonce: gTokenBalance.nonce,
+      };
+      await gToken.connect(pairOwner).setApprovalForAll(governance, true);
+
+      // Propose new pair listing
+      await governance
+        .connect(pairOwner)
+        .proposeNewPairListing(listingFeePayment, securityGTokenPayment, tradeTokenPayment);
+
+      // Validate that the listing was proposed correctly
+      const activeListing = await governance.activeListing();
+      expect(activeListing.owner).to.equal(pairOwner);
+      expect(activeListing.tradeTokenPayment.token).to.equal(await tradeToken.getAddress());
+      expect(activeListing.securityGTokenPayment.nonce).to.equal(securityGTokenPayment.nonce);
+
+      return tradeToken;
+    };
+
+    const newTradeToken = await proposeNewPairListing();
+    return {
+      ...fixtures,
+      governance,
+      gToken,
+      otherUsers,
+      pairOwner,
+      newTradeToken,
+      stake,
+      vote: async <VoteToken extends { amount: BigNumberish; nonce: BigNumberish }>(
+        voteTokens: VoteToken[],
+        voter: HardhatEthersSigner,
+        shouldList: boolean,
+      ) => {
+        await gToken.connect(voter).setApprovalForAll(governance, true);
+        for (const voteToken of voteTokens) {
+          await governance
+            .connect(voter)
+            .vote({ token: gToken, nonce: voteToken.nonce, amount: voteToken.amount }, newTradeToken, shouldList);
+        }
+      },
+    };
+  }
+
+  describe("progressNewPairListing", function () {
+    it("Should revert if no listing is found for the sender", async function () {
+      const {
+        governance,
+        otherUsers: [someUser],
+        epochLength,
+      } = await loadFixture(proposeNewPairListingFixture);
+      await time.increase(epochLength * 8n);
+
+      await expect(governance.connect(someUser).progressNewPairListing()).to.be.revertedWith("No listing found");
+    });
+
+    it("Should return security deposit if proposal does not pass", async function () {
+      const {
+        governance,
+        gToken,
+        stake,
+        otherUsers: [largeVoter, smallVoter],
+        newTradeToken,
+        epochLength,
+        pairOwner,
+      } = await loadFixture(proposeNewPairListingFixture);
+      await stake(largeVoter, {
+        amount: { gainzAmount: parseEther("736365") },
+        epochsLocked: 1080,
+      });
+      await stake(smallVoter, {
+        epochsLocked: 1080,
+        amount: { gainzAmount: parseEther("0.000363") },
+      });
+
+      const [voteToken] = await gToken.getGTokenBalance(smallVoter);
+      await gToken.connect(smallVoter).setApprovalForAll(governance, true);
+      await governance
+        .connect(smallVoter)
+        .vote({ token: gToken, nonce: voteToken.nonce, amount: voteToken.amount }, newTradeToken, true);
+
+      await time.increase(epochLength * 8n);
+      const expectedSecurityLpPayment = (await governance.activeListing()).securityGTokenPayment;
+      await governance.connect(pairOwner).progressNewPairListing();
+
+      expect((await governance.activeListing()).owner).to.be.eq(ZeroAddress);
+      expect((await governance.pairOwnerListing(pairOwner)).owner).to.be.eq(ZeroAddress);
+      expect(await gToken.hasSFT(pairOwner, expectedSecurityLpPayment.nonce)).to.be.eq(
+        true,
+        "Security deposit must be returned",
+      );
+    });
+
+    it("Should proceed to the next stage if proposal passes", async function () {
+      const {
+        governance,
+        gToken,
+        stake,
+        otherUsers: [voter],
+        newTradeToken,
+        epochLength,
+        pairOwner,
+        launchPairContract,
+      } = await loadFixture(proposeNewPairListingFixture);
+
+      await stake(voter, {
+        epochsLocked: 1080,
+        amount: { gainzAmount: parseEther("123456") },
+      });
+      const voteTokens = await gToken.getGTokenBalance(voter);
+
+      await gToken.connect(voter).setApprovalForAll(governance, true);
+      for (const voteToken of voteTokens) {
+        await governance
+          .connect(voter)
+          .vote({ token: gToken, nonce: voteToken.nonce, amount: voteToken.amount }, newTradeToken, true);
+      }
+
+      await time.increase(epochLength * 8n);
+      await governance.connect(pairOwner).progressNewPairListing();
+
+      const { campaignId } = await governance.pairOwnerListing(pairOwner);
+      expect(campaignId).to.be.gt(0);
+      expect((await launchPairContract.campaigns(campaignId)).creator).to.be.equal(pairOwner.address);
+    });
+
+    it("Should fail the listing if the campaign is unsuccessful", async function () {
+      const {
+        governance,
+        gToken,
+        stake,
+        otherUsers: [voter],
+        newTradeToken,
+        epochLength,
+        pairOwner,
+        launchPairContract,
+      } = await loadFixture(proposeNewPairListingFixture);
+
+      await stake(voter, {
+        epochsLocked: 1080,
+        amount: { gainzAmount: parseEther("123456") },
+      });
+      const voteTokens = await gToken.getGTokenBalance(voter);
+
+      await gToken.connect(voter).setApprovalForAll(governance, true);
+      for (const voteToken of voteTokens) {
+        await governance
+          .connect(voter)
+          .vote({ token: gToken, nonce: voteToken.nonce, amount: voteToken.amount }, newTradeToken, true);
+      }
+
+      await time.increase(epochLength * 8n);
+      await governance.connect(pairOwner).progressNewPairListing();
+
+      const { campaignId, securityGTokenPayment } = await governance.pairOwnerListing(pairOwner);
+      expect(campaignId).to.be.gt(0);
+      await launchPairContract.connect(pairOwner).startCampaign(parseEther("0.34434"), 34, campaignId);
+      await time.increase(4774);
+
+      await governance.connect(pairOwner).progressNewPairListing();
+
+      await expect(governance.connect(pairOwner).progressNewPairListing()).to.be.revertedWith("No listing found");
+
+      expect((await governance.pairOwnerListing(pairOwner)).owner).to.be.eq(ZeroAddress);
+      expect(await gToken.hasSFT(pairOwner, securityGTokenPayment.nonce)).to.be.eq(
+        true,
+        "Security deposit must be returned",
+      );
+    });
+
+    it("Should fail if trying to progress when funds are not withdrawn", async function () {
+      const {
+        governance,
+        gToken,
+        stake,
+        otherUsers: [voter],
+        newTradeToken,
+        epochLength,
+        pairOwner,
+      } = await loadFixture(proposeNewPairListingFixture);
+
+      await stake(voter, {
+        epochsLocked: 1080,
+        amount: { gainzAmount: parseEther("123456") },
+      });
+      const voteTokens = await gToken.getGTokenBalance(voter);
+
+      await gToken.connect(voter).setApprovalForAll(governance, true);
+      for (const voteToken of voteTokens) {
+        await governance
+          .connect(voter)
+          .vote({ token: gToken, nonce: voteToken.nonce, amount: voteToken.amount }, newTradeToken, true);
+      }
+
+      await time.increase(epochLength * 8n);
+      await governance.connect(pairOwner).progressNewPairListing();
+
+      const { campaignId } = await governance.pairOwnerListing(pairOwner);
+      expect(campaignId).to.be.gt(0);
+
+      await expect(governance.connect(pairOwner).progressNewPairListing()).to.be.revertedWith(
+        "Governance: Funding not complete",
+      );
+    });
+
+    it("Should add liquidity and distribute GToken if the campaign is successful", async function () {
+      const {
+        governance,
+        gToken,
+        stake,
+        otherUsers: [voter, lpHaunter1, lpHaunter2],
+        newTradeToken,
+        epochLength,
+        pairOwner,
+        launchPairContract,
+        router,
+      } = await loadFixture(proposeNewPairListingFixture);
+      // Create EDU Pair
+      // await router.createPair({ token: ZeroAddress, amount: 0, nonce: 0 }, { value: parseEther("0.93645") });
+
+      await stake(voter, {
+        epochsLocked: 1080,
+        amount: { gainzAmount: parseEther("123456") },
+      });
+      const voteTokens = await gToken.getGTokenBalance(voter);
+
+      await gToken.connect(voter).setApprovalForAll(governance, true);
+      for (const voteToken of voteTokens) {
+        await governance
+          .connect(voter)
+          .vote({ token: gToken, nonce: voteToken.nonce, amount: voteToken.amount }, newTradeToken, true);
+      }
+      await time.increase(epochLength * 8n);
+      await governance.connect(pairOwner).progressNewPairListing();
+
+      const { campaignId, securityGTokenPayment, tradeTokenPayment } = await governance.pairOwnerListing(pairOwner);
+      expect(campaignId).to.be.gt(0);
+      await launchPairContract.connect(pairOwner).startCampaign(parseEther("0.000345"), 3600, campaignId);
+      const campaign = await launchPairContract.campaigns(campaignId);
+
+      await launchPairContract.connect(lpHaunter1).contribute(campaignId, { value: campaign.goal / 2n });
+      await launchPairContract.connect(lpHaunter2).contribute(campaignId, { value: campaign.goal });
+
+      await time.increase(30 * 3600);
+
+      // This will create locked GToken
+      await governance.connect(pairOwner).progressNewPairListing();
+      expect(
+        (await gToken.getGTokenBalance(pairOwner)).find(token => token.nonce == securityGTokenPayment.nonce)?.nonce,
+      ).to.eq(securityGTokenPayment.nonce, "Security GToken should be returned back to pair owner");
+
+      expect((await governance.activeListing()).owner).to.be.eq(ZeroAddress);
+
+      // This will create pair and activate trading
+      // await governance.connect(pairOwner).progressNewPairListing();
+      // expect((await router.tradeableTokens()).includes(tradeTokenPayment.token)).to.equal(
+      //   true,
+      //   "tradeTokenPayment token should be listed",
+      // );
+
+      expect((await gToken.getNonces(lpHaunter1)).length + (await gToken.getNonces(lpHaunter2)).length).to.eq(0);
+      await launchPairContract.connect(lpHaunter1).withdrawLaunchPairToken(campaignId);
+      await launchPairContract.connect(lpHaunter2).withdrawLaunchPairToken(campaignId);
+      expect((await gToken.getNonces(lpHaunter1)).length + (await gToken.getNonces(lpHaunter2)).length).to.eq(2);
+
+      const campaignAfter = await launchPairContract.getCampaignDetails(campaignId);
+      expect(campaignAfter.gtokenNonce).to.be.gt(0);
+    });
+  });
+
+  describe.skip("vote", function () {
+    it("Should revert if the trade token is not active", async function () {
+      const { governance, gToken } = await loadFixture(proposeNewPairListingFixture);
+      await expect(
+        governance.vote({ token: gToken, nonce: 1, amount: parseEther("100") }, "0xInvalidTokenAddress", true),
+      ).to.be.revertedWith("Token not active");
+    });
+
+    it("Should revert if the gToken payment is invalid", async function () {
+      const { governance, newTradeToken } = await loadFixture(proposeNewPairListingFixture);
+      await expect(
+        governance.vote({ token: "0xInvalidTokenAddress", nonce: 1, amount: parseEther("100") }, newTradeToken, true),
+      ).to.be.revertedWith("Governance: Invalid Payment");
+    });
+
+    it("Should correctly register a user's vote", async function () {
+      const { governance, gToken, newTradeToken } = await loadFixture(proposeNewPairListingFixture);
+      await governance.vote({ token: gToken, nonce: 1, amount: parseEther("100") }, newTradeToken, true);
+
+      const activeListing = await governance.activeListing();
+      expect(activeListing.yesVote).to.equal(parseEther("100"));
+    });
+
+    it("Should increase total GToken amount after voting", async function () {
+      const { governance, gToken, newTradeToken } = await loadFixture(proposeNewPairListingFixture);
+      await governance.vote({ token: gToken, nonce: 1, amount: parseEther("100") }, newTradeToken, true);
+
+      const activeListing = await governance.activeListing();
+      expect(activeListing.totalGTokenAmount).to.equal(parseEther("100"));
+    });
+  });
+
+  describe("recallVoteToken", function () {
+    it("Should revert if the user has no votes to recall", async function () {
+      const {
+        governance,
+        gToken,
+        otherUsers: [voter],
+        vote,
+        stake,
+        epochLength,
+      } = await loadFixture(proposeNewPairListingFixture);
+
+      // Get multiple gToken
+      for (let i = 0; i < 5; i++) {
+        await stake(voter, {
+          epochsLocked: 1080,
+          amount: { gainzAmount: parseEther("1000") },
+        });
+        await stake(voter, {
+          epochsLocked: 1080,
+          amount: { gainzAmount: parseEther("1000") },
+        });
+        await stake(voter, {
+          epochsLocked: 1080,
+          amount: { gainzAmount: parseEther("1000") },
+        });
+      }
+      await vote(await gToken.getGTokenBalance(voter), voter, false);
+
+      await time.increase(epochLength * 100n);
+
+      await expect(governance.connect(voter).recallVoteToken()).to.not.be.reverted;
+      await expect(governance.connect(voter).recallVoteToken()).to.not.be.reverted;
+      await expect(governance.connect(voter).recallVoteToken()).to.be.revertedWith("No vote found");
+    });
   });
 });

@@ -17,12 +17,15 @@ import PriceOracleBuild from "../../artifacts/contracts/PriceOracle.sol/PriceOra
 import { getRouterLibraries } from "../../utilities";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { hours } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
-import { TokenPaymentStruct } from "../../typechain-types/contracts/governance";
+import type { TokenPaymentStruct } from "../../typechain-types/contracts/Governance";
+import type { ERC20, Gainz, Pair, Router, TestERC20, WNTV } from "../../typechain-types";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 export async function routerFixture() {
   const [owner, ...users] = await ethers.getSigners();
 
   const gainzToken = await ethers.deployContract("TestERC20", ["GainZ Token", "GNZ", 18]);
+  const gainzTokenAddr = await gainzToken.getAddress();
 
   const routerLibs = await getRouterLibraries(ethers);
   const RouterFactory = await ethers.getContractFactory("Router", {
@@ -30,6 +33,7 @@ export async function routerFixture() {
   });
   const router = await RouterFactory.deploy();
   await router.initialize(owner, gainzToken);
+  await router.setPriceOracle();
 
   const wrappedNativeToken = await router.getWrappedNativeToken();
   const routerAddress = await router.getAddress();
@@ -39,6 +43,9 @@ export async function routerFixture() {
   const governance = await ethers.getContractAt("Governance", governanceAddress);
   const gTokenAddress = await governance.getGToken();
   const gToken = await ethers.getContractAt("GToken", gTokenAddress);
+
+  await governance.runInit(owner, owner);
+  const launchPairContract = await ethers.getContractAt("LaunchPair", await governance.launchPair());
 
   const priceOracle = await ethers.getContractAt(
     "PriceOracle",
@@ -137,6 +144,78 @@ export async function routerFixture() {
     return [...payments, pairProxy] as [TokenPaymentStruct, TokenPaymentStruct, string];
   }
 
+  const addLiquidity = async (
+    {
+      signer = users[0],
+      mint = true,
+    }: {
+      signer?: HardhatEthersSigner;
+      mint?: boolean;
+    },
+    ...args: Parameters<Router["addLiquidity"]>
+  ) => {
+    const [paymentA, paymentB] = args;
+    for (const payment of [paymentA, paymentB] as [TokenPaymentStruct, TokenPaymentStruct]) {
+      const tradeToken = (await ethers.getContractAt("ERC20", payment.token.toString())) as TestERC20 | ERC20;
+
+      if (mint) {
+        "mint" in tradeToken
+          ? await tradeToken.connect(owner).mint(signer, payment.amount)
+          : await tradeToken.connect(owner).transfer(signer, payment.amount);
+      }
+
+      tradeToken.connect(signer).approve(router, payment.amount);
+    }
+    return router.connect(signer).addLiquidity(...args);
+  };
+
+  const stake = async (
+    signer = users[0],
+    otherParams: {
+      epochsLocked?: number;
+      amount?: { gainzAmount: BigNumberish } | { nativeAmount: BigNumberish };
+    } = {},
+  ) => {
+    if (otherParams.epochsLocked == undefined) {
+      otherParams.epochsLocked = 1080;
+    }
+    if (otherParams.amount == undefined) {
+      otherParams.amount = { nativeAmount: parseEther("900") };
+    }
+
+    const { epochsLocked, amount } = otherParams;
+
+    const payment = {
+      ...("gainzAmount" in amount
+        ? { token: gainzTokenAddr, amount: amount.gainzAmount }
+        : { token: wrappedNativeToken, amount: amount.nativeAmount }),
+      nonce: 0,
+    };
+
+    if (payment.token != wrappedNativeToken) {
+      await gainzToken.mintApprove(signer, governance, payment.amount);
+    }
+
+    // User enters governance
+    await governance
+      .connect(signer)
+      .stake(
+        payment,
+        epochsLocked,
+        [[payment.token], [payment.token, payment.token == gainzTokenAddr ? wrappedNativeToken : gainzTokenAddr], []],
+        0,
+        0,
+        {
+          // @ts-expect-error
+          value: amount.nativeAmount || 0n,
+        },
+      );
+
+    await gToken.connect(signer).setApprovalForAll(governance, true);
+
+    return await gToken.getGTokenBalance(signer);
+  };
+
   await time.increase(hours(1));
 
   return {
@@ -144,8 +223,11 @@ export async function routerFixture() {
     governance,
     gToken,
     gainzToken,
+    launchPairContract,
     createPair,
     createToken,
+    addLiquidity,
+    stake,
     owner,
     users,
     governanceAddress,
@@ -154,5 +236,24 @@ export async function routerFixture() {
     feeTo: await router.feeTo(),
     RouterFactory,
     routerLibs,
+  };
+}
+
+export async function claimRewardsFixture() {
+  const { router, createPair, gainzToken, owner, governance, ...fixtures } = await routerFixture();
+
+  const [, , gainzNativePairAddr] = await createPair({
+    paymentA: { amount: parseEther("100"), nonce: 0, token: ZeroAddress },
+    paymentB: { token: gainzToken, amount: parseEther("0.001"), nonce: 0 },
+  });
+  return {
+    gainzToken,
+    gainzNativePair: await ethers.getContractAt("Pair", gainzNativePairAddr),
+    owner,
+    governance,
+    epochLength: (await governance.epochs()).epochLength,
+    LISTING_FEE: await governance.listing_fees(),
+    router,
+    ...fixtures,
   };
 }
