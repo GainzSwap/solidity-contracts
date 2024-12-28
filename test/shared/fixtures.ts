@@ -44,7 +44,6 @@ export async function routerFixture() {
   const gTokenAddress = await governance.getGToken();
   const gToken = await ethers.getContractAt("GToken", gTokenAddress);
 
-  await governance.runInit(owner, owner);
   const launchPairContract = await ethers.getContractAt("LaunchPair", await governance.launchPair());
 
   const priceOracle = await ethers.getContractAt(

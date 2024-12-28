@@ -30,6 +30,7 @@ const deployPairs: DeployFunction = async function (hre: HardhatRuntimeEnvironme
     ["Governance", governanceAdr],
     ["GToken", gTokenAddr],
     ["WNTV", wNativeToken],
+    ["LaunchPair", await governance.launchPair()],
   ];
 
   for (const [contract, address] of artifactsToSave) {

@@ -23,7 +23,6 @@ task("upgradeGovernance", "Upgrades governance").setAction(async (_, hre) => {
   });
 
   const governance = await ethers.getContractAt("Governance", governanceAddress);
-  await governance.runInit(deployer, deployer);
 
   // These contracts will be indexed on our graph
   const artifactsToSave = [

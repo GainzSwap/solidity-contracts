@@ -338,6 +338,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		Epochs.Storage memory _epochs,
 		address gainzToken,
 		address wNativeToken,
+		address protocolFeesCollector_,
 		address proxyAdmin
 	) public initializer {
 		address router = msg.sender;
@@ -357,19 +358,11 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 		require(gainzToken != address(0), "Invalid gainzToken");
 		$.gainzToken = gainzToken;
-	}
-
-	function runInit(
-		address protocolFeesCollector_,
-		address proxyAdmin
-	) public {
-		GovernanceStorage storage $ = _getGovernanceStorage();
 
 		$.launchPair = DeployLaunchPair.newLaunchPair($.gtoken, proxyAdmin);
 
 		require(
-			protocolFeesCollector_ != address(0) &&
-				$.protocolFeesCollector == address(0),
+			protocolFeesCollector_ != address(0),
 			"Invalid Protocol Fees collector"
 		);
 		$.protocolFeesCollector = protocolFeesCollector_;
@@ -568,7 +561,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		uint256 value,
 		uint256 thresholdValue
 	) private pure returns (bool) {
-		console.log("Value: %s, threshold %s", value, thresholdValue);
 		return thresholdValue > 0 && value >= (thresholdValue * 51) / 100;
 	}
 
@@ -604,7 +596,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			listing.yesVote + listing.noVote
 		);
 		if (!(passedForTotalGToken && passedForYesVotes)) {
-			console.log("NOt passed");
 			// If the proposal did not pass, return the deposits to the listing owner.
 			_returnListingDeposits(listing);
 			return false;
@@ -636,8 +627,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		require(listing.owner != address(0), "No listing found");
 
 		if (listing.campaignId == 0) {
-			console.log("creating..");
-
 			_createFundRaisingCampaignForListing(listing);
 		} else {
 			// Retrieve details of the existing campaign.
@@ -657,8 +646,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			if (campaign.status != LaunchPair.CampaignStatus.Success) {
 				// If the campaign failed, return the deposits to the listing owner.
 				if (campaign.status == LaunchPair.CampaignStatus.Failed) {
-					console.log("failed");
-
 					_returnListingDeposits(listing);
 					return;
 				}
@@ -728,8 +715,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			$.launchPair.receiveGToken(gTokenPayment, listing.campaignId);
 			// complete the proposal
 			delete $.pairOwnerListing[msg.sender];
-
-			console.log("done");
 		}
 	}
 

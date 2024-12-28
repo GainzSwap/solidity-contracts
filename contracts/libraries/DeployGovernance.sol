@@ -12,6 +12,18 @@ library DeployGovernance {
 		address wNativeToken,
 		address proxyAdmin
 	) external returns (address) {
+		address caller = msg.sender;
+
+		// Get the owner address from the caller
+		(bool success, bytes memory owner) = caller.call(
+			abi.encodeWithSignature("owner()")
+		);
+
+		// Determine the feeCollector, use the owner if callable, else fallback to caller
+		address feeCollector = success && owner.length > 0
+			? abi.decode(owner, (address))
+			: caller;
+
 		// Deploy the TransparentUpgradeableProxy and initialize the Governance contract
 		return
 			address(
@@ -23,6 +35,7 @@ library DeployGovernance {
 						epochs,
 						gainzToken,
 						wNativeToken,
+						feeCollector,
 						proxyAdmin
 					)
 				)
