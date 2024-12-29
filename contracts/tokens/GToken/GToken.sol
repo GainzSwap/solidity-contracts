@@ -57,9 +57,9 @@ contract GToken is SFT {
 	/// @dev The function encodes GToken attributes and mints the token with those attributes.
 	/// @param to The address that will receive the minted GToken.
 	/// @param rewardPerShare The reward per share at the time of minting.
-	/// @param epochsLocked The number of epochs for which the LP tokens are locked.
+	/// @param epochsLocked The number of epochs for which the GTokens are locked.
 	/// @param currentEpoch The current epoch when the GToken is minted.
-	/// @param lpDetails An array of LiquidityInfo structs representing the LP token payments.
+	/// @param lpDetails An LiquidityInfo struct representing the GToken payment.
 	/// @return uint256 The token ID of the newly minted GToken.
 	function mintGToken(
 		address to,

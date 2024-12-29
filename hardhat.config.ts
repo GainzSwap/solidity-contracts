@@ -21,6 +21,7 @@ import "./scripts/updateStartBlock";
 import "./scripts/upgradePairs";
 import "./scripts/runE2ELocalnet";
 import "./scripts/deployNewViews";
+import "./scripts/deployERC20";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey =

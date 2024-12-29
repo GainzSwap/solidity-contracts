@@ -561,12 +561,12 @@ describe("Governance", function () {
         .vote({ token: gToken, nonce: voteToken.nonce, amount: voteToken.amount }, newTradeToken, true);
 
       await time.increase(epochLength * 8n);
-      const expectedSecurityLpPayment = (await governance.activeListing()).securityGTokenPayment;
+      const expectedSecurityGTokenPayment = (await governance.activeListing()).securityGTokenPayment;
       await governance.connect(pairOwner).progressNewPairListing();
 
       expect((await governance.activeListing()).owner).to.be.eq(ZeroAddress);
       expect((await governance.pairOwnerListing(pairOwner)).owner).to.be.eq(ZeroAddress);
-      expect(await gToken.hasSFT(pairOwner, expectedSecurityLpPayment.nonce)).to.be.eq(
+      expect(await gToken.hasSFT(pairOwner, expectedSecurityGTokenPayment.nonce)).to.be.eq(
         true,
         "Security deposit must be returned",
       );
