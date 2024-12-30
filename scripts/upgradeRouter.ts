@@ -2,6 +2,8 @@ import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { getRouterLibraries } from "../utilities";
 import { Router } from "../typechain-types";
+import PriceOracleBuild from "../artifacts/contracts/PriceOracle.sol/PriceOracle.json";
+import { getCreate2Address, keccak256, solidityPackedKeccak256 } from "ethers";
 
 task("upgradeRouter", "").setAction(async (_, hre) => {
   const { ethers } = hre;
@@ -23,6 +25,26 @@ task("upgradeRouter", "").setAction(async (_, hre) => {
 
   const { abi, metadata } = await hre.deployments.getExtendedArtifact("Router");
   await hre.deployments.save("Router", { abi, metadata, address: routerAddress });
+
+  await router.setPriceOracle();
+  const allPairs = await router.pairs();
+
+  const priceOracle = await ethers.getContractAt(
+    "PriceOracle",
+    getCreate2Address(
+      routerAddress,
+      solidityPackedKeccak256(["address"], [routerAddress]),
+      keccak256(PriceOracleBuild.bytecode),
+    ),
+  );
+
+  await Promise.allSettled(
+    allPairs.map(async pair => {
+      const Pair = await ethers.getContractAt("Pair", pair);
+      console.log({pair});
+      await priceOracle.add(Pair.token0(), Pair.token1());
+    }),
+  );
 
   const { save, getExtendedArtifact } = hre.deployments;
 

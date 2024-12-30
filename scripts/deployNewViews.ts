@@ -1,6 +1,5 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
-import { getRouterLibraries } from "../utilities";
 import { Router } from "../typechain-types";
 
 task("deployNewViews", "").setAction(async (_, hre) => {

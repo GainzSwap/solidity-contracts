@@ -57,6 +57,16 @@ const config: HardhatUserConfig = {
       url: "https://rpc.open-campus-codex.gelato.digital",
       accounts: [deployerPrivateKey],
     },
+    "neox-t4": {
+      url: "https://neoxt4seed1.ngd.network",
+      accounts: [deployerPrivateKey],
+      gasPrice: 40000000000,
+    },
+    neox: {
+      url: "https://mainnet-3.rpc.banelabs.org",
+      accounts: [deployerPrivateKey],
+      gasPrice: 40000000000,
+    },
   },
   // configuration for harhdat-verify plugin
   etherscan: {
