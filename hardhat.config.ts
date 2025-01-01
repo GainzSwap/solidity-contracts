@@ -63,14 +63,14 @@ const config: HardhatUserConfig = {
       gasPrice: 40000000000,
     },
     neox: {
-      url: "https://mainnet-3.rpc.banelabs.org",
+      url: "https://mainnet-1.rpc.banelabs.org",
       accounts: [deployerPrivateKey],
-      gasPrice: 40000000000,
+      gasPrice: 40e9,
     },
   },
   // configuration for harhdat-verify plugin
   etherscan: {
-    apiKey: { opencampus: "NOT NEEDED" },
+    apiKey: { opencampus: "NOT NEEDED", neox: "empty" },
     customChains: [
       {
         network: "opencampus",
@@ -78,6 +78,14 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://edu-chain-testnet.blockscout.com/api",
           browserURL: "https://edu-chain-testnet.blockscout.com",
+        },
+      },
+      {
+        network: "neox",
+        chainId: 47763,
+        urls: {
+          apiURL: "https://xexplorer.neo.org/api",
+          browserURL: "https://xexplorer.neo.org",
         },
       },
     ],

@@ -16,8 +16,8 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
 
   console.log("\n\nCreating Pair", { gainzAddress, wNativeToken }, "\n\n");
 
-  const gainzPayment = { token: gainzAddress, nonce: 0, amount: parseEther("0.001851851852") };
-  const nativePayment = { token: wNativeToken, nonce: 0, amount: parseEther("0.005") };
+  const gainzPayment = { token: gainzAddress, nonce: 0, amount: parseEther("185.1851852") };
+  const nativePayment = { token: wNativeToken, nonce: 0, amount: parseEther("500") };
 
   try {
     await gainz.approve(router, gainzPayment.amount);
