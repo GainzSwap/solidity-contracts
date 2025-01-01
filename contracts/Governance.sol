@@ -417,24 +417,29 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		if (paymentA.token == $.wNativeToken) return paymentA.amount;
 		if (paymentB.token == $.wNativeToken) return paymentB.amount;
 
+		// Validate the pathToNative
 		if (
-			// `pathToNative` has valid length
-			pathToNative.length < 2 || // The last token must be native token (i.e the reference token)
-			pathToNative[pathToNative.length - 1] != $.wNativeToken || //  The first token must be one of the payments' token
-			!(pathToNative[0] == paymentA.token ||
-				pathToNative[0] == paymentB.token)
+			pathToNative.length < 2 || // `pathToNative` must have valid length
+			pathToNative[pathToNative.length - 1] != $.wNativeToken || // The last token must be the native token (i.e., the reference token)
+			(pathToNative[0] != paymentA.token &&
+				pathToNative[0] != paymentB.token) // The first token must be one of the payment tokens
 		) revert InvalidPath(pathToNative);
 
+		// Determine which payment token to use for the conversion
 		TokenPayment memory payment = pathToNative[0] == paymentA.token
 			? paymentA
 			: paymentB;
+
+		// Get the PriceOracle instance
 		PriceOracle priceOracle = PriceOracle(
 			OracleLibrary.oracleAddress($.router)
 		);
 
-		// Start with payment amount
+		// Start with the payment amount
 		value = payment.amount;
-		for (uint256 i; i < pathToNative.length - 1; i++) {
+
+		// Convert the payment amount to the native token using the provided path
+		for (uint256 i = 0; i < pathToNative.length - 1; i++) {
 			value = priceOracle.updateAndConsult(
 				pathToNative[i],
 				pathToNative[i + 1],
@@ -442,6 +447,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			);
 		}
 
+		// Ensure the computed value is valid
 		require(value > 0, "Governance: INVALID_COMPUTED_LIQ_VALUE");
 	}
 
@@ -452,17 +458,22 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		uint256 amountOutMinA,
 		uint256 amountOutMinB
 	) external payable returns (uint256) {
+		// Validate the payment amount
 		if (
 			payment.amount == 0 ||
 			(msg.value > 0 && payment.amount != msg.value)
 		) revert InvalidPayment(payment, msg.value);
 
+		// Retrieve the governance storage
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
+		// Initialize liquidity info
 		LiquidityInfo memory liqInfo;
 		{
+			// Receive and approve the payment
 			_receiveAndApprovePayment(payment, $.router);
 
+			// Swap the payment tokens into the desired tokens
 			TokenPayment memory paymentA = _getDesiredToken(
 				paths[0],
 				payment,
@@ -478,6 +489,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 				"Governance: INVALID_PATH_VALUES"
 			);
 
+			// Approve the router to spend the swapped tokens
 			if (paymentA.token != payment.token) paymentA.approve($.router);
 			if (paymentB.token != payment.token) paymentB.approve($.router);
 
@@ -486,14 +498,17 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 				? (paymentA.token, paymentB.token)
 				: (paymentB.token, paymentA.token);
 
+			// Add liquidity using the router
 			(, , liqInfo.liquidity, liqInfo.pair) = Router(payable($.router))
 				.addLiquidity(paymentA, paymentB, 0, 0, block.timestamp + 1);
 
+			// Compute the liquidity value
 			liqInfo.liqValue = payment.token == $.wNativeToken
 				? msg.value / 2
 				: _computeLiqValue($, paymentA, paymentB, paths[2]);
 		}
 
+		// Mint GToken tokens for the user
 		return
 			GToken($.gtoken).mintGToken(
 				msg.sender,

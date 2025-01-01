@@ -1,56 +1,72 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
-import { getRouterLibraries } from "../utilities";
+import { getGovernanceLibraries, getRouterLibraries } from "../utilities";
 import { Router } from "../typechain-types";
-import PriceOracleBuild from "../artifacts/contracts/PriceOracle.sol/PriceOracle.json";
-import { getCreate2Address, keccak256, solidityPackedKeccak256 } from "ethers";
 
 task("upgradeRouter", "").setAction(async (_, hre) => {
   const { ethers } = hre;
 
+  const govLib = await getGovernanceLibraries(ethers);
+  const routerLibs = await getRouterLibraries(ethers, govLib);
+
   const { deployer } = await hre.getNamedAccounts();
   const router = await ethers.getContract<Router>("Router", deployer);
   const routerAddress = await router.getAddress();
+  const governanceAddress = await router.getGovernance();
+
   const routerFactory = async () =>
     ethers.getContractFactory("Router", {
-      libraries: await getRouterLibraries(ethers),
+      libraries: routerLibs,
+    });
+  const governanceFactory = async () =>
+    ethers.getContractFactory("Governance", {
+      libraries: govLib,
     });
 
-  const routerProxy = await hre.upgrades.forceImport(routerAddress, await routerFactory());
-
   await hre.run("compile");
+
+  console.log("Upgrading Router");
+  const routerProxy = await hre.upgrades.forceImport(routerAddress, await routerFactory());
   await hre.upgrades.upgradeProxy(routerProxy, await routerFactory(), {
     unsafeAllow: ["external-library-linking"],
   });
 
-  const { abi, metadata } = await hre.deployments.getExtendedArtifact("Router");
-  await hre.deployments.save("Router", { abi, metadata, address: routerAddress });
+  console.log("Upgrading Governance");
+  const governanceProxy = await hre.upgrades.forceImport(governanceAddress, await governanceFactory());
+  await hre.upgrades.upgradeProxy(governanceProxy, await governanceFactory(), {
+    unsafeAllow: ["external-library-linking"],
+  });
 
-  await router.setPriceOracle();
+  console.log("Setting price oracle");
+  try {
+    await router.setPriceOracle();
+  } catch (error) {
+    console.log("Error setting price oracle", error);
+  }
+
+  console.log("Adding pairs to price oracle");
+  const OracleLib = await ethers.getContractAt("OracleLibrary", routerLibs.OracleLibrary);
   const allPairs = await router.pairs();
+  const priceOracle = await ethers.getContractAt("PriceOracle", await OracleLib.oracleAddress(routerAddress));
 
-  const priceOracle = await ethers.getContractAt(
-    "PriceOracle",
-    getCreate2Address(
-      routerAddress,
-      solidityPackedKeccak256(["address"], [routerAddress]),
-      keccak256(PriceOracleBuild.bytecode),
-    ),
-  );
+  for (const pair of allPairs) {
+    const Pair = await ethers.getContractAt("Pair", pair);
+    const token0 = await Pair.token0();
+    const token1 = await Pair.token1();
 
-  await Promise.allSettled(
-    allPairs.map(async pair => {
-      const Pair = await ethers.getContractAt("Pair", pair);
-      console.log({pair});
-      await priceOracle.add(Pair.token0(), Pair.token1());
-    }),
-  );
+    console.log({ pair, token0, token1 });
 
+    await priceOracle.add(token0, token1);
+  }
+
+  console.log("Saving artifacts");
   const { save, getExtendedArtifact } = hre.deployments;
-
+  const governance = await ethers.getContractAt("Governance", governanceAddress);
   const artifactsToSave = [
     ["Router", routerAddress],
     ["WNTV", await router.getWrappedNativeToken()],
+    ["Governance", governanceAddress],
+    ["LaunchPair", await governance.launchPair()],
   ];
 
   for (const [contract, address] of artifactsToSave) {

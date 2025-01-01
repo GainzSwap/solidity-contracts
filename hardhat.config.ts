@@ -14,7 +14,6 @@ import "@openzeppelin/hardhat-upgrades";
 
 import "./scripts/createInitialPairs";
 import "./scripts/distributeRewards";
-import "./scripts/upgradeGovernance";
 import "./scripts/upgradeRouter";
 import "./scripts/moveTime";
 import "./scripts/updateStartBlock";
@@ -22,6 +21,7 @@ import "./scripts/upgradePairs";
 import "./scripts/runE2ELocalnet";
 import "./scripts/deployNewViews";
 import "./scripts/deployERC20";
+import "./scripts/createPair";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey =

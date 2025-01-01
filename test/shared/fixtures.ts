@@ -14,11 +14,11 @@ import {
 import { getPairProxyAddress } from "./utilities";
 
 import PriceOracleBuild from "../../artifacts/contracts/PriceOracle.sol/PriceOracle.json";
-import { getRouterLibraries } from "../../utilities";
+import { getGovernanceLibraries, getRouterLibraries } from "../../utilities";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { hours } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 import type { TokenPaymentStruct } from "../../typechain-types/contracts/Governance";
-import type { ERC20, Gainz, Pair, Router, TestERC20, WNTV } from "../../typechain-types";
+import type { ERC20, Router, TestERC20 } from "../../typechain-types";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 export async function routerFixture() {
@@ -27,7 +27,7 @@ export async function routerFixture() {
   const gainzToken = await ethers.deployContract("TestERC20", ["GainZ Token", "GNZ", 18]);
   const gainzTokenAddr = await gainzToken.getAddress();
 
-  const routerLibs = await getRouterLibraries(ethers);
+  const routerLibs = await getRouterLibraries(ethers, await getGovernanceLibraries(ethers));
   const RouterFactory = await ethers.getContractFactory("Router", {
     libraries: routerLibs,
   });

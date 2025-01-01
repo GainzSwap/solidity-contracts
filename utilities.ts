@@ -11,8 +11,10 @@ export async function getGovernanceLibraries(ethers: typeof e) {
   };
 }
 
-export async function getRouterLibraries(ethers: typeof e) {
-  const govLibs = await getGovernanceLibraries(ethers);
+export async function getRouterLibraries(
+  ethers: typeof e,
+  govLibs: Awaited<ReturnType<typeof getGovernanceLibraries>>,
+) {
   const AMMLibrary = await (await ethers.deployContract("AMMLibrary")).getAddress();
 
   return {
