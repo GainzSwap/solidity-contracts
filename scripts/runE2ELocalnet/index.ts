@@ -10,8 +10,6 @@ task("runE2ELocalnet", "").setAction(async (_, hre) => {
     throw new Error("This task can only be run on localhost");
   }
 
-  const accounts = await ethers.getSigners();
-
   const router = await ethers.getContract<Router>("Router", deployer);
   const wnative = await router.getWrappedNativeToken();
   const paths = await Promise.all(
@@ -26,34 +24,33 @@ task("runE2ELocalnet", "").setAction(async (_, hre) => {
 
   const swapPath = paths.find(path => path.includes(wnative))!;
 
-  await Promise.all(
-    accounts.map(async (tester, index) => {
-      const token0 = await ethers.getContractAt("ERC20", swapPath[0]);
+  const accounts = await ethers.getSigners();
+  for (const tester of accounts) {
+    const token0 = await ethers.getContractAt("ERC20", swapPath[0]);
 
-      let amountIn = ethers.parseEther("0.001");
+    let amountIn = ethers.parseEther("0.001");
 
-      // Acquire ERc20 token
-      await router
-        .connect(tester)
-        .swapExactTokensForTokens(amountIn, 1, swapPath.slice().reverse(), tester.address, Number.MAX_SAFE_INTEGER, {
-          value: amountIn,
-        });
+    // Acquire ERc20 token
+    await router
+      .connect(tester)
+      .swapExactTokensForTokens(amountIn, 1, swapPath.slice().reverse(), tester.address, Number.MAX_SAFE_INTEGER, {
+        value: amountIn,
+      });
 
-      amountIn = await token0.balanceOf(tester.address);
+    amountIn = await token0.balanceOf(tester.address);
 
-      await token0.connect(tester).approve(router, amountIn);
+    await token0.connect(tester).approve(router, amountIn);
 
-      const args = [amountIn, 1, swapPath, tester.address, Number.MAX_SAFE_INTEGER] as const;
+    const args = [amountIn, 1, swapPath, tester.address, Number.MAX_SAFE_INTEGER] as const;
 
-      const RouterLib = require("../../verification/libs/localhost/Router.js");
-      const RouterFactory = await ethers.getContractFactory("Router", { libraries: RouterLib });
-      return await router
-        .connect(tester)
-        // .swapExactTokensForTokens(...args);
-        .registerAndSwap(
-          await router.totalUsers(),
-          RouterFactory.interface.encodeFunctionData(router.swapExactTokensForTokens.name, args),
-        );
-    }),
-  );
+    const RouterLib = require("../../verification/libs/localhost/Router.js");
+    const RouterFactory = await ethers.getContractFactory("Router", { libraries: RouterLib });
+    const referrerId = Math.floor(Math.random() * +(await router.totalUsers()).toString());
+    return await router
+      .connect(tester)
+      .registerAndSwap(
+        referrerId,
+        RouterFactory.interface.encodeFunctionData(router.swapExactTokensForTokens.name, args),
+      );
+  }
 });
