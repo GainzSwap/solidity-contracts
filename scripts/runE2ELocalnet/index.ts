@@ -46,11 +46,13 @@ task("runE2ELocalnet", "").setAction(async (_, hre) => {
     const RouterLib = require("../../verification/libs/localhost/Router.js");
     const RouterFactory = await ethers.getContractFactory("Router", { libraries: RouterLib });
     const referrerId = Math.floor(Math.random() * +(await router.totalUsers()).toString());
-    return await router
-      .connect(tester)
-      .registerAndSwap(
-        referrerId,
-        RouterFactory.interface.encodeFunctionData(router.swapExactTokensForTokens.name, args),
-      );
+    await (
+      await router
+        .connect(tester)
+        .registerAndSwap(
+          referrerId,
+          RouterFactory.interface.encodeFunctionData(router.swapExactTokensForTokens.name, args),
+        )
+    ).wait(1);
   }
 });
