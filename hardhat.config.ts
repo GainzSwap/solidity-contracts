@@ -52,6 +52,7 @@ const config: HardhatUserConfig = {
     // If the network you are looking for is not here you can add new network settings
     hardhat: {
       mining: { auto: true, interval: 12_000 },
+      accounts: { accountsBalance: "50000000000000000000000000" },
     },
     opencampus: {
       url: "https://rpc.open-campus-codex.gelato.digital",
