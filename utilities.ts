@@ -3,12 +3,16 @@ import { ethers as e } from "hardhat";
 export async function getGovernanceLibraries(ethers: typeof e) {
   const OracleLibrary = await (await ethers.deployContract("OracleLibrary")).getAddress();
 
-  return {
+  const libs = {
     DeployLaunchPair: await (await ethers.deployContract("DeployLaunchPair")).getAddress(),
     GovernanceLib: await (await ethers.deployContract("GovernanceLib", { libraries: { OracleLibrary } })).getAddress(),
     DeployGToken: await (await ethers.deployContract("DeployGToken")).getAddress(),
     OracleLibrary,
   };
+
+  await saveLibraries(libs, "Governance", ethers);
+
+  return libs;
 }
 
 export async function getRouterLibraries(
@@ -17,7 +21,7 @@ export async function getRouterLibraries(
 ) {
   const AMMLibrary = await (await ethers.deployContract("AMMLibrary")).getAddress();
 
-  return {
+  const libs = {
     OracleLibrary: govLibs.OracleLibrary,
     DeployWNTV: await (await ethers.deployContract("DeployWNTV")).getAddress(),
     RouterLib: await (await ethers.deployContract("RouterLib", { libraries: { AMMLibrary } })).getAddress(),
@@ -31,6 +35,10 @@ export async function getRouterLibraries(
       ).deploy()
     ).getAddress(),
   };
+
+  await saveLibraries(libs, "Router", ethers);
+
+  return libs;
 }
 
 import * as fs from "fs";
@@ -60,6 +68,27 @@ export async function copyFilesRecursively(src: string, dest: string): Promise<v
       fs.copyFileSync(srcPath, destPath);
     }
   }
+}
+
+async function saveLibraries(libraries: Record<string, string>, contractName: string, ethers: typeof e) {
+  const network = await ethers.provider.getNetwork();
+
+  const libPath = `verification/libs/${network.name}/${contractName}.js`;
+
+  // Convert the object to a JSON string with indentation for readability
+  const jsonString = JSON.stringify(libraries, null, 2);
+
+  // Define the file path where the object will be saved
+  const filePath = path.join(__dirname, "../verification/libs/neox/Router.js");
+
+  // Write the JSON string to the file
+  fs.writeFile(libPath, `module.exports = ${jsonString};\n`, "utf8", err => {
+    if (err) {
+      console.error("Error writing file:", err);
+    } else {
+      console.log("File has been saved.");
+    }
+  });
 }
 
 import { HardhatRuntimeEnvironment } from "hardhat/types";

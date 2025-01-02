@@ -1,6 +1,6 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { getRouterLibraries } from "../utilities";
+import { getGovernanceLibraries, getRouterLibraries } from "../utilities";
 
 const deployRouterContract: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
@@ -12,7 +12,7 @@ const deployRouterContract: DeployFunction = async function (hre: HardhatRuntime
   await gainzToken.waitForDeployment();
 
   const Router = await ethers.getContractFactory("Router", {
-    libraries: await getRouterLibraries(ethers),
+    libraries: await getRouterLibraries(ethers, await getGovernanceLibraries(ethers)),
   });
   const gainzAddress = await gainzToken.getAddress();
   const router = await upgrades.deployProxy(Router, [deployer, gainzAddress], {
