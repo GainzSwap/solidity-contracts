@@ -47,6 +47,7 @@
     "@types/qrcode": "~1.5.5",
     "@typescript-eslint/eslint-plugin": "~8.8.1",
     "@typescript-eslint/parser": "~8.8.1",
+    "axios": "^1.7.9",
     "chai": "~4.5.0",
     "eslint": "~8.57.1",
     "eslint-config-prettier": "~8.10.0",
