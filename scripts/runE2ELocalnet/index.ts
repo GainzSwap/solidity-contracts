@@ -11,7 +11,7 @@ task("runE2ELocalnet", "").setAction(async (_, hre) => {
 
   while (true) {
     const accountStart = randomNumber(0, accounts.length);
-    const accountEnd = randomNumber(accountStart, accounts.length);
+    const accountEnd = randomNumber(accountStart, accountStart + 10);
     const selectedAccounts = accounts.slice(accountStart, accountEnd);
 
     await actions[randomNumber(0, actions.length)](hre, selectedAccounts);
