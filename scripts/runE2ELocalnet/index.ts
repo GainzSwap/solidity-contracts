@@ -21,7 +21,7 @@ task("runE2ELocalnet", "").setAction(async (_, hre) => {
         axios.get("http://localhost:3000/api/user/stats/" + account.address + "?chainId=31337"),
       ),
     );
-    
+
     await sleep(randomNumber(1000, 6_000));
   }
 });
