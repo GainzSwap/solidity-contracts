@@ -45,7 +45,7 @@ export async function routerFixture() {
   const gTokenAddress = await governance.getGToken();
   const gToken = await ethers.getContractAt("GToken", gTokenAddress);
 
-  await gainzToken.setInitData(governanceAddress);
+  await gainzToken.runInit(governanceAddress);
 
   const launchPairContract = await ethers.getContractAt("LaunchPair", await governance.launchPair());
 

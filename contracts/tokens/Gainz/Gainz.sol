@@ -51,7 +51,7 @@ contract Gainz is ERC20Upgradeable, ERC20BurnableUpgradeable {
 		_mint(msg.sender, GainzInfo.MAX_SUPPLY);
 	}
 
-	function setInitData(address governance) external {
+	function runInit(address governance) external {
 		GainzERC20Storage storage $ = _getGainzERC20Storage(); // Access namespaced storage
 		require($.governance == address(0), "Allready set");
 		require(governance != address(0), "Invalid Address");
