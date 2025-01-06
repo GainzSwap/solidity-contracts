@@ -1,6 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Router } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { randomNumber } from "../../utilities";
 
 export default async function swap(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("Swapping");
@@ -23,10 +24,9 @@ export default async function swap(hre: HardhatRuntimeEnvironment, accounts: Har
   const swapPath = paths.find(path => path.includes(wnative))!;
   await Promise.all(
     accounts.map(async tester => {
-      console.log("Swapping", { tester: tester.address });
       const token0 = await ethers.getContractAt("ERC20", swapPath[0]);
 
-      let amountIn = ethers.parseEther("0.001");
+      let amountIn = ethers.parseEther(randomNumber(0.005, 50).toFixed(+(await token0.decimals()).toString()));
       // Acquire ERc20 token
       await router
         .connect(tester)
@@ -34,6 +34,7 @@ export default async function swap(hre: HardhatRuntimeEnvironment, accounts: Har
           value: amountIn,
         });
       amountIn = await token0.balanceOf(tester.address);
+      console.log("Swapping", { tester: tester.address, amountIn: ethers.formatEther(amountIn) });
 
       await token0.connect(tester).approve(router, amountIn);
 

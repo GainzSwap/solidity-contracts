@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Gainz, Router } from "../../typechain-types";
 import { randomNumber } from "../../utilities";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import vote from "./vote";
 
 export default async function stake(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nStaking");
@@ -20,7 +21,7 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
   for (const account of accounts) {
     const amount = await ethers.provider.getBalance(account.address).then(bal => {
       const randBal = Math.floor(Math.random() * +bal.toString());
-      return BigInt(randBal) / 10n;
+      return BigInt(randBal) / 10_000n;
     });
 
     console.log(`Staking ${ethers.formatEther(amount)}`);
@@ -29,11 +30,15 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
       .connect(account)
       .stake(
         { amount, token: wnative, nonce: 0 },
-        randomNumber(180, 1080),
+        randomNumber(800, 1080),
         [[wnative], [wnative, gainzAddress], []],
         1n,
         1n,
         { value: amount },
       );
+
+    await vote(hre, accounts);
   }
+
+  hre.run("distributeRewards", { amount: "0.01500", network: hre.network.name });
 }

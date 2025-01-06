@@ -40,7 +40,7 @@ const config: HardhatUserConfig = {
       },
     },
   },
-  defaultNetwork: "localhost",
+  defaultNetwork: "hardhat",
   namedAccounts: {
     deployer: {
       // By default, it will take the first Hardhat account as the deployer
@@ -52,7 +52,7 @@ const config: HardhatUserConfig = {
     // If the network you are looking for is not here you can add new network settings
     hardhat: {
       mining: { auto: true, interval: 12_000 },
-      accounts: { accountsBalance: "50000000000000000000000000", count: 1_000 },
+      accounts: { accountsBalance: "50000000000000000000000000", count: 30 },
     },
     opencampus: {
       url: "https://rpc.open-campus-codex.gelato.digital",
