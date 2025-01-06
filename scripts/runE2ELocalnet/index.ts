@@ -7,9 +7,10 @@ import axios from "axios";
 import vote from "./vote";
 import fundCampaign from "./fundCampaign";
 import recallVote from "./recallVote";
+import claimRewards from "./claimRewards";
 
 task("runE2ELocalnet", "").setAction(async (_, hre) => {
-  const actions = [fundCampaign, stake, vote, swap, recallVote];
+  const actions = [fundCampaign, stake, vote, swap, recallVote, claimRewards];
   const accounts = await hre.ethers.getSigners();
 
   while (true) {
