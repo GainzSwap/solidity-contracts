@@ -4,6 +4,8 @@ import { getGovernanceLibraries, getRouterLibraries } from "../utilities";
 import { Gainz, Router } from "../typechain-types";
 
 task("upgradeGovernance", "").setAction(async (_, hre) => {
+  await hre.run("compile");
+
   const { ethers } = hre;
 
   const govLib = await getGovernanceLibraries(ethers);
@@ -25,12 +27,13 @@ task("upgradeGovernance", "").setAction(async (_, hre) => {
     ethers.getContractFactory("Governance", {
       libraries: govLib,
     });
-  const gainzFactory = async () =>
-    ethers.getContractFactory("Gainz", {
-      libraries: govLib,
-    });
+  const gainzFactory = async () => ethers.getContractFactory("Gainz");
 
-  await hre.run("compile");
+  console.log("Upgrading Gainz");
+  console.log({ gainzAddress });
+  const gainzProxy = await hre.upgrades.forceImport(gainzAddress, await gainzFactory());
+  await hre.upgrades.upgradeProxy(gainzProxy, await gainzFactory());
+  await gainz.setInitData(governanceAddress);
 
   console.log("Upgrading Router");
   const routerProxy = await hre.upgrades.forceImport(routerAddress, await routerFactory());
@@ -43,13 +46,6 @@ task("upgradeGovernance", "").setAction(async (_, hre) => {
   await hre.upgrades.upgradeProxy(governanceProxy, await governanceFactory(), {
     unsafeAllow: ["external-library-linking"],
   });
-
-  console.log("Upgrading Gainz");
-  const gainProxy = await hre.upgrades.forceImport(gainzAddress, await gainzFactory());
-  await hre.upgrades.upgradeProxy(gainProxy, await gainzFactory(), {
-    unsafeAllow: ["external-library-linking"],
-  });
-  await gainz.setInitData(governanceAddress);
 
   console.log("Saving artifacts");
   const { save, getExtendedArtifact } = hre.deployments;
