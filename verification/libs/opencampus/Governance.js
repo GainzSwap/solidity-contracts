@@ -1,0 +1,6 @@
+module.exports = {
+  "DeployLaunchPair": "0x64E5Af6439f2f57063A1c88fD071473827EE5AD6",
+  "GovernanceLib": "0xe4B9dA36924CD3ed93C67a5c7Fd3A75F428fc1E0",
+  "DeployGToken": "0x516faCEDF77c08BB70BAD08D3c62d035bFF963F3",
+  "OracleLibrary": "0x3ed7891e817c1E02af8F85EfB67987628bCBb329"
+};

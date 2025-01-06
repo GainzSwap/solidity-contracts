@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { ERC20BurnableUpgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import { GainzInfo } from "./GainzInfo.sol";
 import { GainzEmission } from "./GainzEmission.sol";
@@ -17,7 +18,11 @@ import { Router } from "../../Router.sol";
  * with the total supply set to the maximum defined in the `GainzInfo` library. The token is burnable
  * and is controlled by the owner of the contract.
  */
-contract Gainz is ERC20Upgradeable, ERC20BurnableUpgradeable {
+contract Gainz is
+	ERC20Upgradeable,
+	ERC20BurnableUpgradeable,
+	OwnableUpgradeable
+{
 	using Epochs for Epochs.Storage;
 
 	/// @custom:storage-location erc7201:gainz.GainzERC20.storage
@@ -45,15 +50,12 @@ contract Gainz is ERC20Upgradeable, ERC20BurnableUpgradeable {
 	 * @dev Initializes the ERC20Upgradeable token with the name "Gainz Token" and symbol "Gainz".
 	 * Mints the maximum supply of tokens to the contract owner.
 	 */
-	function initialize() public initializer {
+	function initialize(address governance) public initializer {
 		__ERC20_init("Gainz Token", "Gainz");
 		// Mint the maximum supply to the contract owner.
-		_mint(msg.sender, GainzInfo.MAX_SUPPLY);
-	}
+		_mint(msg.sender, GainzInfo.ICO_FUNDS);
 
-	function runInit(address governance) external {
 		GainzERC20Storage storage $ = _getGainzERC20Storage(); // Access namespaced storage
-		require($.governance == address(0), "Allready set");
 		require(governance != address(0), "Invalid Address");
 
 		$.lastTimestamp = block.timestamp;
@@ -64,12 +66,6 @@ contract Gainz is ERC20Upgradeable, ERC20BurnableUpgradeable {
 
 		require(success, "Invalid Governance");
 		$.epochs = abi.decode(epochData, (Epochs.Storage));
-
-		_transfer(
-			msg.sender,
-			address(this),
-			GainzInfo.ECOSYSTEM_DISTRIBUTION_FUNDS
-		);
 	}
 
 	function _computeEdgeEmissions(

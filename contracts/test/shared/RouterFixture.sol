@@ -11,7 +11,7 @@ abstract contract RouterFixture {
 
 	constructor() {
 		gainz = new Gainz();
-		gainz.initialize();
+		gainz.initialize(address(this));
 
 		router = new Router();
 		router.initialize(address(this), address(gainz));

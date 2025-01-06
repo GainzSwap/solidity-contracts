@@ -1,0 +1,8 @@
+module.exports = {
+  "OracleLibrary": "0x3ed7891e817c1E02af8F85EfB67987628bCBb329",
+  "DeployWNTV": "0xBAb762A6E8B113F0f88f6F382fb73e35FD6efF82",
+  "RouterLib": "0x0E93bA001D02bb8f74EdD2651fdB81e3B36d9C3D",
+  "UserModuleLib": "0x938a6F789b0E4f022baD715a981bB16bFdFb9d30",
+  "DeployPriceOracle": "0x5ef5bdC9AF86dD8D94E03F975D095e4aB70325dF",
+  "DeployGovernance": "0x1dE8BA680a9E61DfFCc868b2b4641c2420d71152"
+};
