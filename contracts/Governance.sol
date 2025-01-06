@@ -113,10 +113,10 @@ library GovernanceLib {
 	}
 
 	function _calculateClaimableReward(
-		Governance.GovernanceStorage storage $,
 		address user,
 		uint256 nonce,
-		uint256 rewardPerShareAdded
+		address gtoken,
+		uint256 rewardPerShare
 	)
 		internal
 		view
@@ -125,12 +125,11 @@ library GovernanceLib {
 			GTokenLib.Attributes memory attributes
 		)
 	{
-		attributes = GToken($.gtoken).getBalanceAt(user, nonce).attributes;
+		attributes = GToken(gtoken).getBalanceAt(user, nonce).attributes;
 
 		claimableReward = FullMath.mulDiv(
 			attributes.stakeWeight,
-			($.rewardPerShare - rewardPerShareAdded) -
-				attributes.rewardPerShare,
+			rewardPerShare - attributes.rewardPerShare,
 			FixedPoint128.Q128
 		);
 	}
@@ -149,7 +148,7 @@ library GovernanceLib {
 		(
 			uint256 claimableReward,
 			GTokenLib.Attributes memory attributes
-		) = _calculateClaimableReward($, user, nonce, 0);
+		) = _calculateClaimableReward(user, nonce, $.gtoken, $.rewardPerShare);
 
 		// Transfer the claimable rewards to the user, if any
 		if (claimableReward > 0) {
@@ -569,7 +568,12 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		(
 			uint256 claimableReward,
 			GTokenLib.Attributes memory attributes
-		) = GovernanceLib._calculateClaimableReward($, user, nonce, 0);
+		) = GovernanceLib._calculateClaimableReward(
+				user,
+				nonce,
+				$.gtoken,
+				$.rewardPerShare
+			);
 
 		require(claimableReward > 0, "Governance: No rewards to claim");
 
@@ -907,16 +911,16 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 	) external view returns (uint256 totalClaimable) {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
-		(, uint rps) = _addGainzMint(
+		(, uint256 rpsToAdd) = _addGainzMint(
 			Gainz($.gainzToken).gainzToEmit(),
 			GToken($.gtoken).totalStakeWeight()
 		);
 
 		(totalClaimable, ) = GovernanceLib._calculateClaimableReward(
-			$,
 			user,
 			nonce,
-			rps
+			$.gtoken,
+			$.rewardPerShare + rpsToAdd
 		);
 	}
 
