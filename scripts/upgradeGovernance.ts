@@ -30,22 +30,25 @@ task("upgradeGovernance", "").setAction(async (_, hre) => {
   const gainzFactory = async () => ethers.getContractFactory("Gainz");
 
   console.log("Upgrading Gainz");
-  console.log({ gainzAddress });
   const gainzProxy = await hre.upgrades.forceImport(gainzAddress, await gainzFactory());
-  await hre.upgrades.upgradeProxy(gainzProxy, await gainzFactory());
+  await (await hre.upgrades.upgradeProxy(gainzProxy, await gainzFactory())).waitForDeployment();
   await gainz.setInitData(governanceAddress);
 
   console.log("Upgrading Router");
   const routerProxy = await hre.upgrades.forceImport(routerAddress, await routerFactory());
-  await hre.upgrades.upgradeProxy(routerProxy, await routerFactory(), {
-    unsafeAllow: ["external-library-linking"],
-  });
+  await (
+    await hre.upgrades.upgradeProxy(routerProxy, await routerFactory(), {
+      unsafeAllow: ["external-library-linking"],
+    })
+  ).waitForDeployment();
 
   console.log("Upgrading Governance");
   const governanceProxy = await hre.upgrades.forceImport(governanceAddress, await governanceFactory());
-  await hre.upgrades.upgradeProxy(governanceProxy, await governanceFactory(), {
-    unsafeAllow: ["external-library-linking"],
-  });
+  await (
+    await hre.upgrades.upgradeProxy(governanceProxy, await governanceFactory(), {
+      unsafeAllow: ["external-library-linking"],
+    })
+  ).waitForDeployment();
 
   console.log("Saving artifacts");
   const { save, getExtendedArtifact } = hre.deployments;
