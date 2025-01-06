@@ -30,9 +30,8 @@ task("upgradeGovernance", "").setAction(async (_, hre) => {
   const gainzFactory = async () => ethers.getContractFactory("Gainz");
 
   console.log("Upgrading Gainz");
-  await (
-    await (await hre.upgrades.upgradeProxy(gainzAddress, await gainzFactory())).waitForDeployment()
-  ).runInit(governanceAddress);
+  await (await hre.upgrades.upgradeProxy(gainzAddress, await gainzFactory())).waitForDeployment();
+  await (await gainz.runInit(governanceAddress)).wait(2);
 
   console.log("Upgrading Router");
   const routerProxy = await hre.upgrades.forceImport(routerAddress, await routerFactory());
