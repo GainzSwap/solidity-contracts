@@ -50,11 +50,13 @@ contract Gainz is
 	 * @dev Initializes the ERC20Upgradeable token with the name "Gainz Token" and symbol "Gainz".
 	 * Mints the maximum supply of tokens to the contract owner.
 	 */
-	function initialize(address governance) public initializer {
+	function initialize() public initializer {
 		__ERC20_init("Gainz Token", "Gainz");
 		// Mint the maximum supply to the contract owner.
 		_mint(msg.sender, GainzInfo.ICO_FUNDS);
+	}
 
+	function runInit(address governance) external {
 		GainzERC20Storage storage $ = _getGainzERC20Storage(); // Access namespaced storage
 		require(governance != address(0), "Invalid Address");
 

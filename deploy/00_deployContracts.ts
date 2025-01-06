@@ -21,6 +21,8 @@ const deployRouterContract: DeployFunction = async function (hre: HardhatRuntime
   await router.waitForDeployment();
   await router.setPriceOracle();
 
+  await gainzToken.runInit(await router.getGovernance());
+
   const routerAddress = await router.getAddress();
 
   const Views = await ethers.getContractFactory("Views", {
