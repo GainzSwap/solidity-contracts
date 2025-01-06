@@ -30,7 +30,9 @@ task("upgradeGovernance", "").setAction(async (_, hre) => {
   const gainzFactory = async () => ethers.getContractFactory("Gainz");
 
   console.log("Upgrading Gainz");
-  await (await hre.upgrades.upgradeProxy(gainzAddress, await gainzFactory())).waitForDeployment();
+  await (
+    await hre.upgrades.upgradeProxy(gainzAddress, await gainzFactory(), { redeployImplementation: "always" })
+  ).waitForDeployment();
   await (await gainz.runInit(governanceAddress)).wait(2);
 
   console.log("Upgrading Router");
@@ -38,6 +40,7 @@ task("upgradeGovernance", "").setAction(async (_, hre) => {
   await (
     await hre.upgrades.upgradeProxy(routerProxy, await routerFactory(), {
       unsafeAllow: ["external-library-linking"],
+      redeployImplementation: "always",
     })
   ).waitForDeployment();
 
@@ -46,6 +49,7 @@ task("upgradeGovernance", "").setAction(async (_, hre) => {
   await (
     await hre.upgrades.upgradeProxy(governanceProxy, await governanceFactory(), {
       unsafeAllow: ["external-library-linking"],
+      redeployImplementation: "always",
     })
   ).waitForDeployment();
 
