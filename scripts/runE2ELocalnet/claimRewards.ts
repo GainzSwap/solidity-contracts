@@ -17,9 +17,7 @@ export default async function claimRewards(hre: HardhatRuntimeEnvironment, accou
   for (const account of accounts) {
     try {
       const gTokens = await gToken.getGTokenBalance(account);
-      for (const {
-        nonce,
-      } of gTokens) {
+      for (const { nonce } of gTokens) {
         await governance.connect(account).claimRewards(nonce);
       }
     } catch (error) {
