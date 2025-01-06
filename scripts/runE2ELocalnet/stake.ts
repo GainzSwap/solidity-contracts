@@ -39,6 +39,4 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
 
     await vote(hre, accounts);
   }
-
-  hre.run("distributeRewards", { amount: "0.01500", network: hre.network.name });
 }

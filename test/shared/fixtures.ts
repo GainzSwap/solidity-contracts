@@ -24,7 +24,8 @@ import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signer
 export async function routerFixture() {
   const [owner, ...users] = await ethers.getSigners();
 
-  const gainzToken = await ethers.deployContract("TestERC20", ["GainZ Token", "GNZ", 18]);
+  const gainzToken = await ethers.deployContract("TestGainz");
+  await gainzToken.initialize();
   const gainzTokenAddr = await gainzToken.getAddress();
 
   const routerLibs = await getRouterLibraries(ethers, await getGovernanceLibraries(ethers));
@@ -43,6 +44,8 @@ export async function routerFixture() {
   const governance = await ethers.getContractAt("Governance", governanceAddress);
   const gTokenAddress = await governance.getGToken();
   const gToken = await ethers.getContractAt("GToken", gTokenAddress);
+
+  await gainzToken.setInitData(governanceAddress);
 
   const launchPairContract = await ethers.getContractAt("LaunchPair", await governance.launchPair());
 

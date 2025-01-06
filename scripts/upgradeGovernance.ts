@@ -1,9 +1,9 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { getGovernanceLibraries, getRouterLibraries } from "../utilities";
-import { Router } from "../typechain-types";
+import { Gainz, Router } from "../typechain-types";
 
-task("upgradeRouter", "").setAction(async (_, hre) => {
+task("upgradeGovernance", "").setAction(async (_, hre) => {
   const { ethers } = hre;
 
   const govLib = await getGovernanceLibraries(ethers);
@@ -11,8 +11,11 @@ task("upgradeRouter", "").setAction(async (_, hre) => {
 
   const { deployer } = await hre.getNamedAccounts();
   const router = await ethers.getContract<Router>("Router", deployer);
+  const gainz = await ethers.getContract<Gainz>("Gainz", deployer);
+
   const routerAddress = await router.getAddress();
   const governanceAddress = await router.getGovernance();
+  const gainzAddress = await gainz.getAddress();
 
   const routerFactory = async () =>
     ethers.getContractFactory("Router", {
@@ -20,6 +23,10 @@ task("upgradeRouter", "").setAction(async (_, hre) => {
     });
   const governanceFactory = async () =>
     ethers.getContractFactory("Governance", {
+      libraries: govLib,
+    });
+  const gainzFactory = async () =>
+    ethers.getContractFactory("Gainz", {
       libraries: govLib,
     });
 
@@ -37,36 +44,20 @@ task("upgradeRouter", "").setAction(async (_, hre) => {
     unsafeAllow: ["external-library-linking"],
   });
 
-  console.log("Setting price oracle");
-  try {
-    await router.setPriceOracle();
-  } catch (error) {
-    console.log("Error setting price oracle", error);
-  }
-
-  console.log("Adding pairs to price oracle");
-  const OracleLib = await ethers.getContractAt("OracleLibrary", routerLibs.OracleLibrary);
-  const allPairs = await router.pairs();
-  const priceOracle = await ethers.getContractAt("PriceOracle", await OracleLib.oracleAddress(routerAddress));
-
-  for (const pair of allPairs) {
-    const Pair = await ethers.getContractAt("Pair", pair);
-    const token0 = await Pair.token0();
-    const token1 = await Pair.token1();
-
-    console.log({ pair, token0, token1 });
-
-    await priceOracle.add(token0, token1);
-  }
+  console.log("Upgrading Gainz");
+  const gainProxy = await hre.upgrades.forceImport(gainzAddress, await gainzFactory());
+  await hre.upgrades.upgradeProxy(gainProxy, await gainzFactory(), {
+    unsafeAllow: ["external-library-linking"],
+  });
+  await gainz.setInitData(governanceAddress);
 
   console.log("Saving artifacts");
   const { save, getExtendedArtifact } = hre.deployments;
-  const governance = await ethers.getContractAt("Governance", governanceAddress);
+
   const artifactsToSave = [
     ["Router", routerAddress],
-    ["WNTV", await router.getWrappedNativeToken()],
     ["Governance", governanceAddress],
-    ["LaunchPair", await governance.launchPair()],
+    ["Gainz", gainzAddress],
   ];
 
   for (const [contract, address] of artifactsToSave) {

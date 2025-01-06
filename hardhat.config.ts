@@ -13,8 +13,7 @@ import "hardhat-deploy-ethers";
 import "@openzeppelin/hardhat-upgrades";
 
 import "./scripts/createInitialPairs";
-import "./scripts/distributeRewards";
-import "./scripts/upgradeRouter";
+import "./scripts/upgradeGovernance";
 import "./scripts/moveTime";
 import "./scripts/updateStartBlock";
 import "./scripts/upgradePairs";

@@ -72,6 +72,7 @@ export async function copyFilesRecursively(src: string, dest: string): Promise<v
 
 async function saveLibraries(libraries: Record<string, string>, contractName: string, ethers: typeof e) {
   const network = await ethers.provider.getNetwork();
+  if (network.name == "hardhat") return;
 
   const libPath = `verification/libs/${network.name}/${contractName}.js`;
 

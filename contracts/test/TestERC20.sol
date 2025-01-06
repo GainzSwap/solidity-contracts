@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 
+import { Gainz } from "../tokens/Gainz/Gainz.sol";
+
 contract TestERC20 is ERC20, Ownable, ERC20Burnable {
 	uint8 private immutable _decimals;
 
@@ -25,8 +27,15 @@ contract TestERC20 is ERC20, Ownable, ERC20Burnable {
 		_mint(owner, amt);
 		_approve(owner, spender, amt);
 	}
+}
 
-	function decimals() public view override returns (uint8) {
-		return _decimals;
+contract TestGainz is Gainz {
+	function mint(address to, uint256 amt) external {
+		_mint(to, amt);
+	}
+
+	function mintApprove(address owner, address spender, uint256 amt) public {
+		_mint(owner, amt);
+		_approve(owner, spender, amt);
 	}
 }

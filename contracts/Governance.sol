@@ -20,6 +20,7 @@ import { DeployLaunchPair } from "./libraries/DeployLaunchPair.sol";
 
 import { GToken, GTokenLib, GTokenBalance } from "./tokens/GToken/GToken.sol";
 import { WNTV } from "./tokens/WNTV.sol";
+import { Gainz } from "./tokens/Gainz/Gainz.sol";
 
 import { Pair } from "./Pair.sol";
 import { Router } from "./Router.sol";
@@ -114,7 +115,8 @@ library GovernanceLib {
 	function _calculateClaimableReward(
 		Governance.GovernanceStorage storage $,
 		address user,
-		uint256 nonce
+		uint256 nonce,
+		uint256 rewardPerShareAdded
 	)
 		internal
 		view
@@ -127,7 +129,8 @@ library GovernanceLib {
 
 		claimableReward = FullMath.mulDiv(
 			attributes.stakeWeight,
-			$.rewardPerShare - attributes.rewardPerShare,
+			($.rewardPerShare - rewardPerShareAdded) -
+				attributes.rewardPerShare,
 			FixedPoint128.Q128
 		);
 	}
@@ -138,13 +141,15 @@ library GovernanceLib {
 		uint amount0Min,
 		uint amount1Min
 	) external {
+		Gainz($.gainzToken).mintGainz();
+
 		address user = msg.sender;
 
 		// Calculate rewards to be claimed on unstaking
 		(
 			uint256 claimableReward,
 			GTokenLib.Attributes memory attributes
-		) = _calculateClaimableReward($, user, nonce);
+		) = _calculateClaimableReward($, user, nonce, 0);
 
 		// Transfer the claimable rewards to the user, if any
 		if (claimableReward > 0) {
@@ -519,6 +524,21 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			);
 	}
 
+	function _addGainzMint(
+		uint amount,
+		uint256 totalStakeWeight
+	) private pure returns (uint _rewardsReserve, uint _rewardPerShare) {
+		if (totalStakeWeight > 0) {
+			// Update the rewards reserve
+			_rewardsReserve = amount;
+			_rewardPerShare = FullMath.mulDiv(
+				amount,
+				FixedPoint128.Q128,
+				totalStakeWeight
+			);
+		}
+	}
+
 	/// @notice Updates the rewards reserve by adding the specified amount.
 	function updateRewardReserve() external {
 		GovernanceStorage storage $ = _getGovernanceStorage();
@@ -526,17 +546,13 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		// Transfer the amount of Gainz tokens to the contract
 		uint256 amount = IERC20($.gainzToken).balanceOf(address(this)) -
 			$.rewardsReserve;
+		uint _rewardPerShare;
 
 		uint256 totalStakeWeight = GToken($.gtoken).totalStakeWeight();
-		if (totalStakeWeight > 0) {
-			// Update the rewards reserve
-			$.rewardsReserve += amount;
-			$.rewardPerShare += FullMath.mulDiv(
-				amount,
-				FixedPoint128.Q128,
-				totalStakeWeight
-			);
-		}
+		(amount, _rewardPerShare) = _addGainzMint(amount, totalStakeWeight);
+		// Update the rewards reserve
+		$.rewardsReserve += amount;
+		$.rewardPerShare += _rewardPerShare;
 	}
 
 	/// @notice Allows a user to claim their accumulated rewards based on their current stake.
@@ -547,11 +563,13 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 	function claimRewards(uint256 nonce) external returns (uint256) {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
+		Gainz($.gainzToken).mintGainz();
+
 		address user = msg.sender;
 		(
 			uint256 claimableReward,
 			GTokenLib.Attributes memory attributes
-		) = GovernanceLib._calculateClaimableReward($, user, nonce);
+		) = GovernanceLib._calculateClaimableReward($, user, nonce, 0);
 
 		require(claimableReward > 0, "Governance: No rewards to claim");
 
@@ -887,10 +905,18 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		address user,
 		uint256 nonce
 	) external view returns (uint256 totalClaimable) {
+		GovernanceStorage storage $ = _getGovernanceStorage();
+
+		(, uint rps) = _addGainzMint(
+			Gainz($.gainzToken).gainzToEmit(),
+			GToken($.gtoken).totalStakeWeight()
+		);
+
 		(totalClaimable, ) = GovernanceLib._calculateClaimableReward(
-			_getGovernanceStorage(),
+			$,
 			user,
-			nonce
+			nonce,
+			rps
 		);
 	}
 
