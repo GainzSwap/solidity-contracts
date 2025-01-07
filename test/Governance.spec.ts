@@ -472,10 +472,11 @@ describe("Governance", function () {
       await governance.connect(pairOwner).proposeNewPairListing(securityGTokenPayment, tradeTokenPayment);
 
       // Validate that the listing was proposed correctly
-      const activeListing = await governance.activeListing();
+      const activeListing = await governance.pairListing(pairOwner);
       expect(activeListing.owner).to.equal(pairOwner);
       expect(activeListing.tradeTokenPayment.token).to.equal(await tradeToken.getAddress());
       expect(activeListing.securityGTokenPayment.nonce).to.equal(securityGTokenPayment.nonce);
+      expect(activeListing.campaignId).to.gt(0);
 
       return tradeToken;
     };
@@ -507,7 +508,6 @@ describe("Governance", function () {
     it("Should return security deposit if proposal does not pass", async function () {
       const { governance, gToken, epochLength, pairOwner, launchPairContract } =
         await loadFixture(proposeNewPairListingFixture);
-      await governance.connect(pairOwner).progressNewPairListing();
       const duration = epochLength * 8n;
       await launchPairContract.connect(pairOwner).startCampaign(50n, duration, 1);
 
@@ -528,7 +528,6 @@ describe("Governance", function () {
         await loadFixture(proposeNewPairListingFixture);
 
       await time.increase(epochLength * 8n);
-      await governance.connect(pairOwner).progressNewPairListing();
 
       const { campaignId } = await governance.pairListing(pairOwner);
       expect(campaignId).to.be.gt(0);
@@ -536,11 +535,10 @@ describe("Governance", function () {
     });
 
     it("Should fail the listing if the campaign is unsuccessful", async function () {
-      const { governance, gToken, stake, newTradeToken, epochLength, pairOwner, launchPairContract } =
+      const { governance, gToken, epochLength, pairOwner, launchPairContract } =
         await loadFixture(proposeNewPairListingFixture);
 
       await time.increase(epochLength * 8n);
-      await governance.connect(pairOwner).progressNewPairListing();
 
       const { campaignId, securityGTokenPayment } = await governance.pairListing(pairOwner);
       expect(campaignId).to.be.gt(0);
@@ -559,11 +557,9 @@ describe("Governance", function () {
     });
 
     it("Should fail if trying to progress when funds are not withdrawn", async function () {
-      const { governance, gToken, stake, newTradeToken, epochLength, pairOwner } =
-        await loadFixture(proposeNewPairListingFixture);
+      const { governance, epochLength, pairOwner } = await loadFixture(proposeNewPairListingFixture);
 
       await time.increase(epochLength * 8n);
-      await governance.connect(pairOwner).progressNewPairListing();
 
       const { campaignId } = await governance.pairListing(pairOwner);
       expect(campaignId).to.be.gt(0);
@@ -577,9 +573,7 @@ describe("Governance", function () {
       const {
         governance,
         gToken,
-        stake,
         otherUsers: [lpHaunter1, lpHaunter2],
-        newTradeToken,
         epochLength,
         pairOwner,
         launchPairContract,
@@ -588,9 +582,8 @@ describe("Governance", function () {
       // await router.createPair({ token: ZeroAddress, amount: 0, nonce: 0 }, { value: parseEther("0.93645") });
 
       await time.increase(epochLength * 8n);
-      await governance.connect(pairOwner).progressNewPairListing();
 
-      const { campaignId, securityGTokenPayment, tradeTokenPayment } = await governance.pairListing(pairOwner);
+      const { campaignId, securityGTokenPayment } = await governance.pairListing(pairOwner);
       expect(campaignId).to.be.gt(0);
       await launchPairContract.connect(pairOwner).startCampaign(parseEther("0.000345"), 3600, campaignId);
       const campaign = await launchPairContract.campaigns(campaignId);

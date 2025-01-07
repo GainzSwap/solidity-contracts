@@ -64,23 +64,6 @@ library GovernanceLib {
 			payment.amount >= MIN_LIQ_VALUE_FOR_LISTING;
 	}
 
-	/**
-	 * @notice Ends the voting process for the active token listing.
-	 * @dev This function ensures that the voting period has ended before finalizing the listing.
-	 */
-	function endVoting(Governance.GovernanceStorage storage $) public {
-		require(
-			$.activeListing.endEpoch <= $.epochs.currentEpoch(),
-			"Voting not complete"
-		);
-
-		// Finalize the listing and store it under the owner's and tradeToken address.
-		$.pairListing[$.activeListing.owner] = $.activeListing;
-		$.pairListing[$.activeListing.tradeTokenPayment.token] = $
-			.activeListing;
-		delete $.activeListing; // Clear the active listing to prepare for the next one.
-	}
-
 	function addReward(
 		Governance.GovernanceStorage storage $,
 		TokenPayment calldata payment
@@ -215,14 +198,11 @@ library GovernanceLib {
 		TokenPayment calldata securityPayment,
 		TokenPayment calldata tradeTokenPayment
 	) external {
-		endVoting($);
-
 		address tradeToken = tradeTokenPayment.token;
 
 		// Ensure there is no active listing proposal
 		require(
-			$.pairListing[msg.sender].owner == address(0) &&
-				$.activeListing.owner == address(0),
+			$.pairListing[msg.sender].owner == address(0),
 			"Governance: Previous proposal not completed"
 		);
 
@@ -265,10 +245,15 @@ library GovernanceLib {
 		);
 
 		// Update the active listing with the new proposal details
-		$.activeListing.owner = msg.sender;
-		$.activeListing.tradeTokenPayment = tradeTokenPayment;
-		$.activeListing.securityGTokenPayment = securityPayment;
-		$.activeListing.endEpoch = $.epochs.currentEpoch(); // Voting is disabled
+		Governance.TokenListing memory activeListing;
+		activeListing.owner = msg.sender;
+		activeListing.tradeTokenPayment = tradeTokenPayment;
+		activeListing.securityGTokenPayment = securityPayment;
+		activeListing.endEpoch = $.epochs.currentEpoch(); // Voting is disabled
+		activeListing.campaignId = $.launchPair.createCampaign(msg.sender);
+
+		$.pairListing[activeListing.owner] = activeListing;
+		$.pairListing[activeListing.tradeTokenPayment.token] = activeListing;
 	}
 }
 
@@ -603,20 +588,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		);
 	}
 
-	function _createFundRaisingCampaignForListing(
-		TokenListing storage listing,
-		LaunchPair _launchPair
-	) private returns (bool) {
-		require(
-			listing.campaignId == 0,
-			"Governance: Campaign Created already for Listing"
-		);
-
-		// Create a new campaign for the listing owner.
-		listing.campaignId = _launchPair.createCampaign(listing.owner);
-		return true;
-	}
-
 	/**
 	 * @notice Progresses the new pair listing process for the calling address.
 	 *         This function handles the various stages of the listing, including
@@ -628,106 +599,94 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		// Retrieve the token listing associated with the caller's address.
 		TokenListing storage listing = $.pairListing[msg.sender];
 
-		// If no listing is found for the sender, end the current voting session.
-		if (listing.owner == address(0)) {
-			GovernanceLib.endVoting($); // End the current voting session if no valid listing exists.
-			listing = $.pairListing[msg.sender]; // Refresh listing after ending the vote.
-		}
-
 		// Ensure that a valid listing exists after the potential refresh.
-		require(listing.owner != address(0), "No listing found");
+		require(
+			listing.owner != address(0) && listing.campaignId > 0,
+			"No listing found"
+		);
 
-		if (listing.campaignId == 0) {
-			_createFundRaisingCampaignForListing(listing, $.launchPair);
-		} else {
-			// Retrieve details of the existing campaign.
-			LaunchPair.Campaign memory campaign = $
-				.launchPair
-				.getCampaignDetails(listing.campaignId);
+		// Retrieve details of the existing campaign.
+		LaunchPair.Campaign memory campaign = $.launchPair.getCampaignDetails(
+			listing.campaignId
+		);
 
-			if (campaign.goal > 0 && block.timestamp > campaign.deadline) {
-				if (campaign.fundsRaised < campaign.goal) {
-					campaign.status = LaunchPair.CampaignStatus.Failed;
-				} else {
-					campaign.status = LaunchPair.CampaignStatus.Success;
-				}
+		if (campaign.goal > 0 && block.timestamp > campaign.deadline) {
+			if (campaign.fundsRaised < campaign.goal) {
+				campaign.status = LaunchPair.CampaignStatus.Failed;
+			} else {
+				campaign.status = LaunchPair.CampaignStatus.Success;
 			}
-
-			// Check the campaign status.
-			if (campaign.status != LaunchPair.CampaignStatus.Success) {
-				// If the campaign failed, return the deposits to the listing owner.
-				if (campaign.status == LaunchPair.CampaignStatus.Failed) {
-					_returnListingDeposits(listing);
-					return;
-				}
-
-				// If the campaign is not complete, revert the transaction.
-				revert("Governance: Funding not complete");
-			}
-
-			require(
-				!campaign.isWithdrawn,
-				"Governance: CAMPAIGN_FUNDS_WITHDRAWN"
-			);
-
-			// Store the current balance of the contract before withdrawing funds.
-			uint256 ethBal = address(this).balance;
-			// Withdraw the funds raised in the campaign.
-			uint256 fundsRaised = $.launchPair.withdrawFunds(
-				listing.campaignId
-			);
-			// Ensure that the funds were successfully withdrawn.
-			require(
-				ethBal + fundsRaised == address(this).balance,
-				"Governance: Funds not withdrawn for campaign"
-			);
-
-			listing.tradeTokenPayment.approve($.router);
-
-			// Create the trading pair using the router and receive GToken tokens.
-			delete $.pairListing[listing.tradeTokenPayment.token];
-			(address pair, uint256 liquidity) = Router(payable($.router))
-				.createPair{ value: fundsRaised }(
-				listing.tradeTokenPayment,
-				TokenPayment({
-					token: $.wNativeToken,
-					nonce: 0,
-					amount: fundsRaised
-				})
-			);
-
-			uint liqValue = fundsRaised / 2;
-
-			uint256 gTokenNonce = GToken($.gtoken).mintGToken(
-				address(this),
-				$.rewardPerShare,
-				GTokenLib.MAX_EPOCHS_LOCK,
-				$.epochs.currentEpoch(),
-				LiquidityInfo({
-					pair: pair,
-					liquidity: liquidity,
-					liqValue: liqValue,
-					token0: Pair(pair).token0(),
-					token1: Pair(pair).token1()
-				})
-			);
-
-			// Return the security GToken payment after successful governance entry.
-			listing.securityGTokenPayment.sendToken(listing.owner);
-
-			TokenPayment memory gTokenPayment = TokenPayment({
-				amount: GToken($.gtoken).balanceOf(address(this), gTokenNonce),
-				nonce: gTokenNonce,
-				token: $.gtoken
-			});
-
-			// Approve the GToken tokens for use by the launch pair contract.
-			gTokenPayment.approve(address($.launchPair));
-			// Transfer the GToken tokens to the launch pair contract.
-			$.launchPair.receiveGToken(gTokenPayment, listing.campaignId);
-			// complete the proposal
-			delete $.pairListing[msg.sender];
 		}
+
+		// Check the campaign status.
+		if (campaign.status != LaunchPair.CampaignStatus.Success) {
+			// If the campaign failed, return the deposits to the listing owner.
+			if (campaign.status == LaunchPair.CampaignStatus.Failed) {
+				_returnListingDeposits(listing);
+				return;
+			}
+
+			// If the campaign is not complete, revert the transaction.
+			revert("Governance: Funding not complete");
+		}
+
+		require(!campaign.isWithdrawn, "Governance: CAMPAIGN_FUNDS_WITHDRAWN");
+
+		// Store the current balance of the contract before withdrawing funds.
+		uint256 ethBal = address(this).balance;
+		// Withdraw the funds raised in the campaign.
+		uint256 fundsRaised = $.launchPair.withdrawFunds(listing.campaignId);
+		// Ensure that the funds were successfully withdrawn.
+		require(
+			ethBal + fundsRaised == address(this).balance,
+			"Governance: Funds not withdrawn for campaign"
+		);
+
+		listing.tradeTokenPayment.approve($.router);
+
+		// Create the trading pair using the router and receive GToken tokens.
+		delete $.pairListing[listing.tradeTokenPayment.token];
+		(address pair, uint256 liquidity) = Router(payable($.router))
+			.createPair{ value: fundsRaised }(
+			listing.tradeTokenPayment,
+			TokenPayment({
+				token: $.wNativeToken,
+				nonce: 0,
+				amount: fundsRaised
+			})
+		);
+
+		uint liqValue = fundsRaised / 2;
+
+		uint256 gTokenNonce = GToken($.gtoken).mintGToken(
+			address(this),
+			$.rewardPerShare,
+			GTokenLib.MAX_EPOCHS_LOCK,
+			$.epochs.currentEpoch(),
+			LiquidityInfo({
+				pair: pair,
+				liquidity: liquidity,
+				liqValue: liqValue,
+				token0: Pair(pair).token0(),
+				token1: Pair(pair).token1()
+			})
+		);
+
+		// Return the security GToken payment after successful governance entry.
+		listing.securityGTokenPayment.sendToken(listing.owner);
+
+		TokenPayment memory gTokenPayment = TokenPayment({
+			amount: GToken($.gtoken).balanceOf(address(this), gTokenNonce),
+			nonce: gTokenNonce,
+			token: $.gtoken
+		});
+
+		// Approve the GToken tokens for use by the launch pair contract.
+		gTokenPayment.approve(address($.launchPair));
+		// Transfer the GToken tokens to the launch pair contract.
+		$.launchPair.receiveGToken(gTokenPayment, listing.campaignId);
+		// complete the proposal
+		delete $.pairListing[msg.sender];
 	}
 
 	/// @notice Proposes a new pair listing by submitting the required listing fee and GToken payment.
