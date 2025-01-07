@@ -46,7 +46,8 @@ library GovernanceLib {
 	function _isValidGTokenPaymentForListing(
 		TokenPayment calldata payment,
 		address gtoken,
-		address gainzToken
+		address gainzToken,
+		uint256 currentEpoch
 	) private view returns (bool) {
 		// Ensure the payment token is the correct GToken contract
 		if (payment.token != gtoken) {
@@ -57,6 +58,11 @@ library GovernanceLib {
 		GTokenLib.Attributes memory attributes = GToken(gtoken)
 			.getBalanceAt(msg.sender, payment.nonce)
 			.attributes;
+
+		require(
+			attributes.epochsLeft(currentEpoch) >= 1000,
+			"Security GToken Payment Expired"
+		);
 
 		return
 			(attributes.lpDetails.token0 == gainzToken ||
@@ -202,7 +208,7 @@ library GovernanceLib {
 
 		// Ensure there is no active listing proposal
 		require(
-			$.pairListing[msg.sender].owner == address(0),
+			$.pairOwnerListing[msg.sender].owner == address(0),
 			"Governance: Previous proposal not completed"
 		);
 
@@ -224,7 +230,8 @@ library GovernanceLib {
 			_isValidGTokenPaymentForListing(
 				securityPayment,
 				$.gtoken,
-				$.gainzToken
+				$.gainzToken,
+				$.epochs.currentEpoch()
 			),
 			"Governance: Invalid GToken Payment for proposal"
 		);
@@ -252,8 +259,8 @@ library GovernanceLib {
 		activeListing.endEpoch = $.epochs.currentEpoch(); // Voting is disabled
 		activeListing.campaignId = $.launchPair.createCampaign(msg.sender);
 
-		$.pairListing[activeListing.owner] = activeListing;
-		$.pairListing[activeListing.tradeTokenPayment.token] = activeListing;
+		$.pairOwnerListing[activeListing.owner] = activeListing;
+		$.pairOwnerListing[activeListing.tradeTokenPayment.token] = activeListing;
 	}
 }
 
@@ -296,7 +303,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		mapping(address => address) userVote;
 		TokenListing activeListing;
 		EnumerableSet.AddressSet pendingOrListedTokens;
-		mapping(address => TokenListing) pairListing;
+		mapping(address => TokenListing) pairOwnerListing;
 		LaunchPair launchPair;
 	}
 
@@ -579,8 +586,8 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			listing.tradeTokenPayment.sendToken(listing.owner);
 		}
 
-		delete _getGovernanceStorage().pairListing[msg.sender];
-		delete _getGovernanceStorage().pairListing[
+		delete _getGovernanceStorage().pairOwnerListing[msg.sender];
+		delete _getGovernanceStorage().pairOwnerListing[
 			listing.tradeTokenPayment.token
 		];
 		_getGovernanceStorage().pendingOrListedTokens.remove(
@@ -597,7 +604,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
 		// Retrieve the token listing associated with the caller's address.
-		TokenListing storage listing = $.pairListing[msg.sender];
+		TokenListing storage listing = $.pairOwnerListing[msg.sender];
 
 		// Ensure that a valid listing exists after the potential refresh.
 		require(
@@ -645,7 +652,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		listing.tradeTokenPayment.approve($.router);
 
 		// Create the trading pair using the router and receive GToken tokens.
-		delete $.pairListing[listing.tradeTokenPayment.token];
+		delete $.pairOwnerListing[listing.tradeTokenPayment.token];
 		(address pair, uint256 liquidity) = Router(payable($.router))
 			.createPair{ value: fundsRaised }(
 			listing.tradeTokenPayment,
@@ -686,7 +693,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		// Transfer the GToken tokens to the launch pair contract.
 		$.launchPair.receiveGToken(gTokenPayment, listing.campaignId);
 		// complete the proposal
-		delete $.pairListing[msg.sender];
+		delete $.pairOwnerListing[msg.sender];
 	}
 
 	/// @notice Proposes a new pair listing by submitting the required listing fee and GToken payment.
@@ -748,18 +755,10 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		return _getGovernanceStorage().launchPair;
 	}
 
-	function activeListing()
-		public
-		view
-		returns (Governance.TokenListing memory)
-	{
-		return _getGovernanceStorage().activeListing;
-	}
-
 	function pairListing(
 		address pairOwner
 	) public view returns (Governance.TokenListing memory) {
-		return _getGovernanceStorage().pairListing[pairOwner];
+		return _getGovernanceStorage().pairOwnerListing[pairOwner];
 	}
 
 	function epochs() public view returns (Epochs.Storage memory) {

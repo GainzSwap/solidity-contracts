@@ -460,7 +460,9 @@ describe("Governance", function () {
       await tradeToken.connect(pairOwner).approve(governance, tradeTokenPayment.amount);
 
       // Enter governance to create GToken balance
-      const gTokenBalance = (await stake(pairOwner, { amount: { nativeAmount: parseEther("6000") } })).at(-1)!;
+      const gTokenBalance = (
+        await stake(pairOwner, { amount: { nativeAmount: parseEther("6000") }, epochsLocked: 1080 })
+      ).at(-1)!;
       const securityGTokenPayment = {
         token: gToken,
         amount: gTokenBalance.amount,
@@ -515,7 +517,6 @@ describe("Governance", function () {
       const expectedSecurityGTokenPayment = (await governance.pairListing(pairOwner)).securityGTokenPayment;
       await governance.connect(pairOwner).progressNewPairListing();
 
-      expect((await governance.activeListing()).owner).to.be.eq(ZeroAddress);
       expect((await governance.pairListing(pairOwner)).owner).to.be.eq(ZeroAddress);
       expect(await gToken.hasSFT(pairOwner, expectedSecurityGTokenPayment.nonce)).to.be.eq(
         true,
@@ -598,8 +599,6 @@ describe("Governance", function () {
       expect(
         (await gToken.getGTokenBalance(pairOwner)).find(token => token.nonce == securityGTokenPayment.nonce)?.nonce,
       ).to.eq(securityGTokenPayment.nonce, "Security GToken should be returned back to pair owner");
-
-      expect((await governance.activeListing()).owner).to.be.eq(ZeroAddress);
 
       // This will create pair and activate trading
       // await governance.connect(pairOwner).progressNewPairListing();

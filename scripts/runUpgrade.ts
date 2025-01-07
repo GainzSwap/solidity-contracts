@@ -20,15 +20,16 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   await hre.upgrades.upgradeProxy(
     routerAddress,
     await hre.ethers.getContractFactory("Router", { libraries: routerLibs }),
-    { redeployImplementation: "always" },
+    { redeployImplementation: "always", unsafeAllowLinkedLibraries: true },
   );
   console.log("Router upgraded successfully.");
 
   console.log("Upgrading Governance");
+  await hre.upgrades.forceImport(govAddress, await hre.ethers.getContractFactory("Governance", { libraries: govLibs }));
   await hre.upgrades.upgradeProxy(
     govAddress,
     await hre.ethers.getContractFactory("Governance", { libraries: govLibs }),
-    { redeployImplementation: "always" },
+    { redeployImplementation: "always", unsafeAllowLinkedLibraries: true },
   );
   console.log("Governance upgraded successfully.");
 
