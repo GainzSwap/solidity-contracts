@@ -254,7 +254,6 @@ export async function claimRewardsFixture() {
     owner,
     governance,
     epochLength: (await governance.epochs()).epochLength,
-    LISTING_FEE: await governance.listing_fees(),
     router,
     ...fixtures,
   };

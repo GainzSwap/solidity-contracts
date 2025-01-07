@@ -30,7 +30,7 @@ import { LaunchPair } from "./LaunchPair.sol";
 import "./types.sol";
 import "./errors.sol";
 
-uint256 constant LISTING_FEE = 20e18;
+uint256 constant MIN_LIQ_VALUE_FOR_LISTING = 3_000e18;
 
 library GovernanceLib {
 	using Epochs for Epochs.Storage;
@@ -61,7 +61,7 @@ library GovernanceLib {
 		return
 			(attributes.lpDetails.token0 == gainzToken ||
 				attributes.lpDetails.token1 == gainzToken) &&
-			payment.amount >= 1_000e18;
+			payment.amount >= MIN_LIQ_VALUE_FOR_LISTING;
 	}
 
 	/**
@@ -74,8 +74,10 @@ library GovernanceLib {
 			"Voting not complete"
 		);
 
-		// Finalize the listing and store it under the owner's address.
-		$.pairOwnerListing[$.activeListing.owner] = $.activeListing;
+		// Finalize the listing and store it under the owner's and tradeToken address.
+		$.pairListing[$.activeListing.owner] = $.activeListing;
+		$.pairListing[$.activeListing.tradeTokenPayment.token] = $
+			.activeListing;
 		delete $.activeListing; // Clear the active listing to prepare for the next one.
 	}
 
@@ -210,7 +212,6 @@ library GovernanceLib {
 
 	function proposeNewPairListing(
 		Governance.GovernanceStorage storage $,
-		TokenPayment calldata listingFeePayment,
 		TokenPayment calldata securityPayment,
 		TokenPayment calldata tradeTokenPayment
 	) external {
@@ -220,7 +221,7 @@ library GovernanceLib {
 
 		// Ensure there is no active listing proposal
 		require(
-			$.pairOwnerListing[msg.sender].owner == address(0) &&
+			$.pairListing[msg.sender].owner == address(0) &&
 				$.activeListing.owner == address(0),
 			"Governance: Previous proposal not completed"
 		);
@@ -238,14 +239,6 @@ library GovernanceLib {
 				),
 			"Governance: Invalid Trade token"
 		);
-
-		// Check if the correct listing fee amount is provided
-		require(
-			listingFeePayment.amount == LISTING_FEE,
-			"Governance: Invalid sent listing fee"
-		);
-		// Add the listing fee to the rewards pool
-		addReward($, listingFeePayment);
 
 		require(
 			_isValidGTokenPaymentForListing(
@@ -275,7 +268,7 @@ library GovernanceLib {
 		$.activeListing.owner = msg.sender;
 		$.activeListing.tradeTokenPayment = tradeTokenPayment;
 		$.activeListing.securityGTokenPayment = securityPayment;
-		$.activeListing.endEpoch = $.epochs.currentEpoch() + 3;
+		$.activeListing.endEpoch = $.epochs.currentEpoch(); // Voting is disabled
 	}
 }
 
@@ -318,7 +311,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		mapping(address => address) userVote;
 		TokenListing activeListing;
 		EnumerableSet.AddressSet pendingOrListedTokens;
-		mapping(address => TokenListing) pairOwnerListing;
+		mapping(address => TokenListing) pairListing;
 		LaunchPair launchPair;
 	}
 
@@ -594,52 +587,33 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		);
 	}
 
-	function _checkProposalPass(
-		uint256 value,
-		uint256 thresholdValue
-	) private pure returns (bool) {
-		return thresholdValue > 0 && value >= (thresholdValue * 51) / 100;
-	}
-
 	function _returnListingDeposits(TokenListing memory listing) internal {
 		listing.securityGTokenPayment.sendToken(listing.owner);
 
 		if (listing.tradeTokenPayment.amount > 0) {
 			listing.tradeTokenPayment.sendToken(listing.owner);
 		}
-		delete _getGovernanceStorage().pairOwnerListing[msg.sender];
+
+		delete _getGovernanceStorage().pairListing[msg.sender];
+		delete _getGovernanceStorage().pairListing[
+			listing.tradeTokenPayment.token
+		];
 		_getGovernanceStorage().pendingOrListedTokens.remove(
 			listing.tradeTokenPayment.token
 		);
 	}
 
 	function _createFundRaisingCampaignForListing(
-		TokenListing storage listing
+		TokenListing storage listing,
+		LaunchPair _launchPair
 	) private returns (bool) {
 		require(
 			listing.campaignId == 0,
 			"Governance: Campaign Created already for Listing"
 		);
 
-		GovernanceStorage storage $ = _getGovernanceStorage();
-
-		// Check if the proposal passes both the total GToken amount and the voting requirements.
-		bool passedForTotalGToken = _checkProposalPass(
-			listing.totalGTokenAmount,
-			GToken($.gtoken).totalSupply()
-		);
-		bool passedForYesVotes = _checkProposalPass(
-			listing.yesVote,
-			listing.yesVote + listing.noVote
-		);
-		if (!(passedForTotalGToken && passedForYesVotes)) {
-			// If the proposal did not pass, return the deposits to the listing owner.
-			_returnListingDeposits(listing);
-			return false;
-		}
-
 		// Create a new campaign for the listing owner.
-		listing.campaignId = $.launchPair.createCampaign(listing.owner);
+		listing.campaignId = _launchPair.createCampaign(listing.owner);
 		return true;
 	}
 
@@ -652,19 +626,19 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
 		// Retrieve the token listing associated with the caller's address.
-		TokenListing storage listing = $.pairOwnerListing[msg.sender];
+		TokenListing storage listing = $.pairListing[msg.sender];
 
 		// If no listing is found for the sender, end the current voting session.
 		if (listing.owner == address(0)) {
 			GovernanceLib.endVoting($); // End the current voting session if no valid listing exists.
-			listing = $.pairOwnerListing[msg.sender]; // Refresh listing after ending the vote.
+			listing = $.pairListing[msg.sender]; // Refresh listing after ending the vote.
 		}
 
 		// Ensure that a valid listing exists after the potential refresh.
 		require(listing.owner != address(0), "No listing found");
 
 		if (listing.campaignId == 0) {
-			_createFundRaisingCampaignForListing(listing);
+			_createFundRaisingCampaignForListing(listing, $.launchPair);
 		} else {
 			// Retrieve details of the existing campaign.
 			LaunchPair.Campaign memory campaign = $
@@ -711,6 +685,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			listing.tradeTokenPayment.approve($.router);
 
 			// Create the trading pair using the router and receive GToken tokens.
+			delete $.pairListing[listing.tradeTokenPayment.token];
 			(address pair, uint256 liquidity) = Router(payable($.router))
 				.createPair{ value: fundsRaised }(
 				listing.tradeTokenPayment,
@@ -751,136 +726,22 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			// Transfer the GToken tokens to the launch pair contract.
 			$.launchPair.receiveGToken(gTokenPayment, listing.campaignId);
 			// complete the proposal
-			delete $.pairOwnerListing[msg.sender];
+			delete $.pairListing[msg.sender];
 		}
-	}
-
-	/**
-	 * @notice Allows users to vote on whether a new token pair should be listed.
-	 * @param gTokenPayment The gToken payment details used for voting.
-	 * @param tradeToken The address of the trade token being voted on.
-	 * @param shouldList A boolean indicating the user's vote (true for yes, false for no).
-	 */
-	function vote(
-		TokenPayment calldata gTokenPayment,
-		address tradeToken,
-		bool shouldList
-	) external {
-		GovernanceStorage storage $ = _getGovernanceStorage();
-		address user = msg.sender;
-
-		require($.activeListing.endEpoch > currentEpoch(), "Voting complete");
-
-		// Ensure that the trade token is valid and active for voting.
-		require(
-			isERC20(tradeToken) &&
-				$.activeListing.tradeTokenPayment.token == tradeToken,
-			"Token not active"
-		);
-
-		address userLastVotedToken = $.userVote[user];
-		require(
-			userLastVotedToken == address(0) ||
-				userLastVotedToken == $.activeListing.tradeTokenPayment.token,
-			"Please recall previous votes"
-		);
-		require(gTokenPayment.token == $.gtoken, "Governance: Invalid Payment");
-
-		// Calculate the user's vote power based on their gToken attributes.
-		GTokenBalance memory gTokenBalance = GToken($.gtoken).getBalanceAt(
-			user,
-			gTokenPayment.nonce
-		);
-		GTokenLib.Attributes memory attributes = gTokenBalance.attributes;
-		uint256 epochsLeft = attributes.epochsLeft(
-			attributes.epochsElapsed($.epochs.currentEpoch())
-		);
-
-		require(
-			epochsLeft >= 360,
-			"GToken expired, must have at least 360 epochs left to vote with"
-		);
-
-		uint256 votePower = attributes.votePower(epochsLeft);
-
-		// Receive the gToken payment and record the user's vote.
-		gTokenPayment.receiveSFT();
-		$.userVotes[user].add(gTokenPayment.nonce);
-
-		// Apply the user's vote to the active listing.
-		if (shouldList) {
-			$.activeListing.yesVote += votePower;
-		} else {
-			$.activeListing.noVote += votePower;
-		}
-
-		// Update the total GToken amount and record the user's vote for the trade token.
-		$.activeListing.totalGTokenAmount += gTokenBalance.amount;
-		$.userVote[user] = tradeToken;
 	}
 
 	/// @notice Proposes a new pair listing by submitting the required listing fee and GToken payment.
-	/// @param listingFeePayment The payment details for the listing fee.
-	/// @param securityPayment The ADEX payment as security deposit
+	/// @param securityPayment The GToken payment as security deposit
 	/// @param tradeTokenPayment The the trade token to be listed with launchPair distribution amount, if any.
 	function proposeNewPairListing(
-		TokenPayment calldata listingFeePayment,
 		TokenPayment calldata securityPayment,
 		TokenPayment calldata tradeTokenPayment
 	) external {
 		GovernanceLib.proposeNewPairListing(
 			_getGovernanceStorage(),
-			listingFeePayment,
 			securityPayment,
 			tradeTokenPayment
 		);
-	}
-
-	/**
-	 * @notice Allows users to recall their vote tokens after voting has ended or been canceled.
-	 */
-	function recallVoteToken() external {
-		GovernanceStorage storage $ = _getGovernanceStorage(); // Access the main storage
-
-		address user = msg.sender;
-		address tradeToken = $.userVote[user];
-		EnumerableSet.UintSet storage userVoteNonces = $.userVotes[user];
-
-		// Ensure the user has votes to recall.
-		require(userVoteNonces.length() > 0, "No vote found");
-
-		if (tradeToken != address(0)) {
-			if (tradeToken == $.activeListing.tradeTokenPayment.token) {
-				GovernanceLib.endVoting($);
-			}
-		}
-
-		// Recall up to 10 vote tokens at a time.
-		uint256 count = 0;
-		while (count < 10 && userVoteNonces.length() > 0) {
-			count++;
-
-			uint256 nonce = userVoteNonces.at(userVoteNonces.length() - 1);
-			userVoteNonces.remove(nonce);
-			GToken($.gtoken).safeTransferFrom(
-				address(this),
-				user,
-				nonce,
-				GToken($.gtoken).balanceOf(address(this), nonce),
-				""
-			);
-		}
-
-		if (userVoteNonces.length() == 0) {
-			delete $.userVote[user]; // Clear the user's vote record.
-		}
-	}
-
-	function getUserActiveVoteGTokenNonces(
-		address voter
-	) public view returns (uint256[] memory) {
-		GovernanceStorage storage $ = _getGovernanceStorage(); // Access the main storage
-		return $.userVotes[voter].values();
 	}
 
 	function protocolFees() public view returns (uint256) {
@@ -936,22 +797,18 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		return _getGovernanceStorage().activeListing;
 	}
 
-	function pairOwnerListing(
+	function pairListing(
 		address pairOwner
 	) public view returns (Governance.TokenListing memory) {
-		return _getGovernanceStorage().pairOwnerListing[pairOwner];
+		return _getGovernanceStorage().pairListing[pairOwner];
 	}
 
 	function epochs() public view returns (Epochs.Storage memory) {
 		return _getGovernanceStorage().epochs;
 	}
 
-	function userVote(address user) public view returns (address) {
-		return _getGovernanceStorage().userVote[user];
-	}
-
-	function listing_fees() public pure returns (uint256) {
-		return LISTING_FEE;
+	function minLiqValueForListing() public pure returns (uint256) {
+		return MIN_LIQ_VALUE_FOR_LISTING;
 	}
 
 	function currentEpoch() public view returns (uint256) {

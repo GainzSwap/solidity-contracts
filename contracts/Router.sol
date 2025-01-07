@@ -247,15 +247,6 @@ contract Router is
 		}
 	}
 
-	error CreatePairUnauthorized();
-	modifier canCreatePair() {
-		RouterStorage storage $ = _getRouterStorage();
-
-		if (msg.sender != owner() && msg.sender != $.governance)
-			revert CreatePairUnauthorized();
-		_;
-	}
-
 	// **** INITIALIZATION ****
 
 	function initialize(
@@ -301,9 +292,20 @@ contract Router is
 		external
 		payable
 		override
-		canCreatePair
 		returns (address pairAddress, uint256 liquidity)
 	{
+		Governance governance = Governance(
+			payable(_getRouterStorage().governance)
+		);
+		bool isTokenAInFunding = governance.pairListing(paymentA.token).owner !=
+			address(0);
+		bool isTokenBInFunding = governance.pairListing(paymentA.token).owner !=
+			address(0);
+		require(
+			!isTokenAInFunding && !isTokenBInFunding,
+			"Token already in LaunchPair"
+		);
+
 		pairAddress = _createPair(
 			paymentA.token,
 			paymentB.token,
@@ -413,7 +415,6 @@ contract Router is
 		payable
 		virtual
 		ensure(deadline)
-		canCreatePair
 		returns (uint amountA, uint amountB, uint liquidity, address pair)
 	{
 		pair = getPair(paymentA.token, paymentB.token);
@@ -436,12 +437,7 @@ contract Router is
 		uint amountBMin,
 		address to,
 		uint deadline
-	)
-		external
-		ensure(deadline)
-		canCreatePair
-		returns (uint amountA, uint amountB)
-	{
+	) external ensure(deadline) returns (uint amountA, uint amountB) {
 		address pair = getPair(tokenA, tokenB);
 		require(pair != address(0), "Router: INVALID_PAIR");
 

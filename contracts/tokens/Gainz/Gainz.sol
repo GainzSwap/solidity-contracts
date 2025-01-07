@@ -54,6 +54,7 @@ contract Gainz is
 		__ERC20_init("Gainz Token", "Gainz");
 		// Mint the maximum supply to the contract owner.
 		_mint(msg.sender, GainzInfo.ICO_FUNDS);
+		_mint(address(this), GainzInfo.ECOSYSTEM_DISTRIBUTION_FUNDS);
 	}
 
 	function runInit(address governance) external {
