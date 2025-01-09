@@ -3,6 +3,7 @@ import { Gainz, GToken, Router } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { minutes } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
+import { randomNumber } from "../../utilities";
 
 export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nFunding Campaign");
@@ -35,7 +36,7 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
         console.log(error);
       }
 
-      await time.increase(minutes(5));
+      await time.increase(minutes(randomNumber(5, 50)));
     }
   }
 }

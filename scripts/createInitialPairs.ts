@@ -1,7 +1,8 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { Gainz, Router } from "../typechain-types";
-import { parseEther } from "ethers";
+import { parseEther, ZeroAddress } from "ethers";
+import { days } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 
 task("createInitialPairs", "").setAction(async (_, hre) => {
   const { ethers } = hre;
@@ -12,27 +13,27 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
   const gainz = await ethers.getContract<Gainz>("Gainz", deployer);
   const gainzAddress = await gainz.getAddress();
 
+  const governanceAddress = await router.getGovernance();
+  const governance = await ethers.getContractAt("Governance", governanceAddress);
+
   const wNativeToken = await router.getWrappedNativeToken();
 
-  console.log("\n\nCreating Pair", { gainzAddress, wNativeToken }, "\n\n");
+  console.log("\nLaunching Pair", { gainzAddress, wNativeToken }, "\n\n");
 
-  const gainzPayment = { token: gainzAddress, nonce: 0, amount: parseEther("185.1851852") };
-  const nativePayment = { token: wNativeToken, nonce: 0, amount: parseEther("500") };
+  const lpAmount = (await gainz.balanceOf(deployer)) - parseEther("2,100,000".replace(/,/g, ""));
+  const goal = parseEther("768,150.1".replace(/,/g, ""));
 
-  try {
-    await gainz.approve(router, gainzPayment.amount);
-    await router.createPair(gainzPayment, nativePayment, { value: nativePayment.amount });
-  } catch (error) {
-    console.log(error);
-  }
+  await gainz.approve(governance, lpAmount);
 
-  if (hre.network.name == "localhost") {
-    // Send network tokens
-    const testers = process.env.TESTERS?.split(",") ?? [];
-    await Promise.all(
-      testers.map(async tester =>
-        (await ethers.getSigner(deployer)).sendTransaction({ value: parseEther("99"), to: tester }),
-      ),
-    );
-  }
+  await governance.proposeNewPairListing(
+    { nonce: 0, amount: 0, token: ZeroAddress },
+    { nonce: 0, amount: lpAmount, token: gainz },
+  );
+
+  const launchPairAddress = await governance.launchPair();
+  const launchPair = await ethers.getContractAt("LaunchPair", launchPairAddress);
+
+  const { campaignId } = await governance.pairListing(deployer);
+
+  await launchPair.startCampaign(goal, days(30), campaignId);
 });

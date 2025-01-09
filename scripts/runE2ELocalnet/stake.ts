@@ -26,17 +26,19 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
 
     console.log(`Staking ${ethers.formatEther(amount)}`);
 
-    await governance
-      .connect(account)
-      .stake(
-        { amount, token: wnative, nonce: 0 },
-        randomNumber(800, 1080),
-        [[wnative], [wnative, gainzAddress], []],
-        1n,
-        1n,
-        { value: amount },
-      );
-
-    await vote(hre, accounts);
+    try {
+      await governance
+        .connect(account)
+        .stake(
+          { amount, token: wnative, nonce: 0 },
+          randomNumber(800, 1080),
+          [[wnative], [wnative, gainzAddress], []],
+          1n,
+          1n,
+          { value: amount },
+        );
+    } catch (error) {
+      console.error(error);
+    }
   }
 }

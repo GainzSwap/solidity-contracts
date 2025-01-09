@@ -226,20 +226,22 @@ library GovernanceLib {
 			"Governance: Invalid Trade token"
 		);
 
-		require(
-			_isValidGTokenPaymentForListing(
-				securityPayment,
-				$.gtoken,
-				$.gainzToken,
-				$.epochs.currentEpoch()
-			),
-			"Governance: Invalid GToken Payment for proposal"
-		);
-		securityPayment.receiveTokenFor(
-			msg.sender,
-			address(this),
-			$.wNativeToken
-		);
+		if (tradeToken != $.gainzToken) {
+			require(
+				_isValidGTokenPaymentForListing(
+					securityPayment,
+					$.gtoken,
+					$.gainzToken,
+					$.epochs.currentEpoch()
+				),
+				"Governance: Invalid GToken Payment for proposal"
+			);
+			securityPayment.receiveTokenFor(
+				msg.sender,
+				address(this),
+				$.wNativeToken
+			);
+		}
 
 		require(
 			tradeTokenPayment.amount > 0,
@@ -260,7 +262,9 @@ library GovernanceLib {
 		activeListing.campaignId = $.launchPair.createCampaign(msg.sender);
 
 		$.pairOwnerListing[activeListing.owner] = activeListing;
-		$.pairOwnerListing[activeListing.tradeTokenPayment.token] = activeListing;
+		$.pairOwnerListing[
+			activeListing.tradeTokenPayment.token
+		] = activeListing;
 	}
 }
 
@@ -580,19 +584,18 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 	}
 
 	function _returnListingDeposits(TokenListing memory listing) internal {
-		listing.securityGTokenPayment.sendToken(listing.owner);
+		GovernanceStorage storage $ = _getGovernanceStorage();
+
+		if (listing.securityGTokenPayment.nonce != 0)
+			listing.securityGTokenPayment.sendToken(listing.owner);
 
 		if (listing.tradeTokenPayment.amount > 0) {
 			listing.tradeTokenPayment.sendToken(listing.owner);
 		}
 
-		delete _getGovernanceStorage().pairOwnerListing[msg.sender];
-		delete _getGovernanceStorage().pairOwnerListing[
-			listing.tradeTokenPayment.token
-		];
-		_getGovernanceStorage().pendingOrListedTokens.remove(
-			listing.tradeTokenPayment.token
-		);
+		delete $.pairOwnerListing[msg.sender];
+		delete $.pairOwnerListing[listing.tradeTokenPayment.token];
+		$.pendingOrListedTokens.remove(listing.tradeTokenPayment.token);
 	}
 
 	/**
@@ -680,7 +683,8 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		);
 
 		// Return the security GToken payment after successful governance entry.
-		listing.securityGTokenPayment.sendToken(listing.owner);
+		if (listing.securityGTokenPayment.nonce != 0)
+			listing.securityGTokenPayment.sendToken(listing.owner);
 
 		TokenPayment memory gTokenPayment = TokenPayment({
 			amount: GToken($.gtoken).balanceOf(address(this), gTokenNonce),
