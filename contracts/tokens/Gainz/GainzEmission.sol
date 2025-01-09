@@ -112,3 +112,59 @@ library GainzEmission {
 			);
 	}
 }
+
+library Entities {
+	uint32 public constant UNITY = 100_00;
+
+	uint32 public constant TEAM = 15_00;
+	uint32 public constant STAKING = 50_00;
+	uint32 public constant LIQ_INCENTIVE = 25_00;
+	uint32 public constant GROWTH = 10_00;
+
+	struct Value {
+		uint256 team;
+		uint256 growth;
+		uint256 staking;
+		uint256 liqIncentive;
+	}
+
+	/// @notice Allocates total value based on predefined ratios.
+	/// @param totalValue The total value to be allocated.
+	/// @return Allocated values for each category.
+	function fromTotalValue(
+		uint256 totalValue
+	) internal pure returns (Value memory) {
+		uint256 othersTotal = (totalValue * (UNITY - STAKING)) / UNITY;
+
+		uint256 team = (othersTotal * TEAM) / UNITY;
+		uint256 growth = (othersTotal * GROWTH) / UNITY;
+		uint256 liqIncentive = (othersTotal * LIQ_INCENTIVE) / UNITY;
+
+		uint256 staking = totalValue - (team + growth + liqIncentive);
+
+		return
+			Value({
+				team: team,
+				growth: growth,
+				staking: staking,
+				liqIncentive: liqIncentive
+			});
+	}
+
+	/// @notice Computes the total value from individual allocations.
+	/// @param value The `Value` struct containing allocations.
+	/// @return The total value.
+	function total(Value memory value) internal pure returns (uint256) {
+		return value.team + value.growth + value.staking + value.liqIncentive;
+	}
+
+	/// @notice Adds another `Value` struct to the current one.
+	/// @param self The current `Value` struct.
+	/// @param rhs The `Value` struct to add.
+	function add(Value storage self, Value memory rhs) internal {
+		self.team += rhs.team;
+		self.growth += rhs.growth;
+		self.staking += rhs.staking;
+		self.liqIncentive += rhs.liqIncentive;
+	}
+}

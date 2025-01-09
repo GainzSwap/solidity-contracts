@@ -6,7 +6,7 @@ import { ERC20BurnableUpgradeable } from "@openzeppelin/contracts-upgradeable/to
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import { GainzInfo } from "./GainzInfo.sol";
-import { GainzEmission } from "./GainzEmission.sol";
+import { GainzEmission, Entities } from "./GainzEmission.sol";
 
 import { Epochs } from "../../libraries/Epochs.sol";
 
@@ -24,12 +24,14 @@ contract Gainz is
 	OwnableUpgradeable
 {
 	using Epochs for Epochs.Storage;
+	using Entities for Entities.Value;
 
 	/// @custom:storage-location erc7201:gainz.GainzERC20.storage
 	struct GainzERC20Storage {
 		Epochs.Storage epochs;
 		uint256 lastTimestamp;
 		address governance;
+		Entities.Value entityFunds; // Funds allocated to entities
 	}
 
 	// keccak256(abi.encode(uint256(keccak256("gainz.GainzERC20.storage")) - 1)) & ~bytes32(uint256(0xff));
@@ -52,6 +54,7 @@ contract Gainz is
 	 */
 	function initialize() public initializer {
 		__ERC20_init("Gainz Token", "Gainz");
+		__Ownable_init(msg.sender);
 		// Mint the maximum supply to the contract owner.
 		_mint(msg.sender, GainzInfo.ICO_FUNDS);
 		_mint(address(this), GainzInfo.ECOSYSTEM_DISTRIBUTION_FUNDS);
@@ -169,12 +172,43 @@ contract Gainz is
 			return;
 		}
 
-		_transfer(address(this), $.governance, _gainzToEmit);
+		$.entityFunds.add(Entities.fromTotalValue(_gainzToEmit));
+
+		_transfer(address(this), $.governance, $.entityFunds.staking);
+		$.entityFunds.staking = 0;
+
 		(bool success, ) = $.governance.call(
 			abi.encodeWithSignature("updateRewardReserve()")
 		);
 
 		require(success, "Unable to mint");
+	}
+
+	function sendGainz(
+		address to,
+		string memory _entityName
+	) external onlyOwner {
+		GainzERC20Storage storage $ = _getGainzERC20Storage();
+		bytes32 entityName = keccak256(abi.encodePacked(_entityName));
+
+		uint amt;
+		if (entityName == keccak256(abi.encodePacked("team"))) {
+			amt = $.entityFunds.team;
+			$.entityFunds.team = 0;
+		} else if (entityName == keccak256(abi.encodePacked("growth"))) {
+			amt = $.entityFunds.growth;
+			$.entityFunds.growth = 0;
+		} else if (entityName == keccak256(abi.encodePacked("liqIncentive"))) {
+			amt = $.entityFunds.liqIncentive;
+			$.entityFunds.liqIncentive = 0;
+		} else if (entityName == keccak256(abi.encodePacked("staking"))) {
+			amt = $.entityFunds.staking;
+			$.entityFunds.staking = 0;
+		}
+
+		if (amt > 0) {
+			_transfer(address(this), to, amt);
+		}
 	}
 
 	function gainzToEmit() public view returns (uint toEmit) {

@@ -247,7 +247,7 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		uint amount1Out,
 		uint feePercent1,
 		address to
-	) external lock onlyOwner {
+	) external lock {
 		require(
 			amount0Out > 0 || amount1Out > 0,
 			"GainzSwap: INSUFFICIENT_OUTPUT_AMOUNT"

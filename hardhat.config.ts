@@ -21,6 +21,7 @@ import "./scripts/deployNewViews";
 import "./scripts/deployERC20";
 import "./scripts/createPair";
 import "./scripts/runUpgrade";
+import "./scripts/entityFund";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey =
