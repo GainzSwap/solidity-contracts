@@ -227,141 +227,43 @@ describe("Governance", function () {
       await checkBalance("more");
     });
 
-    // it("Should revert if there are no rewards to claim", async function () {
-    //   const [user] = users;
-    //   const stakeAmount = parseEther("0.05");
-    //   const epochsLocked = 1080;
-    //   const nonce = 1;
 
-    //   // Setup: Mint and approve tokenB for staking
-    //   const [{ token: tokenA }, { token: tokenB }] = await createPair();
-    //   const tokenBcontract = await ethers.getContractAt("TestERC20", tokenB as Addressable);
-    //   await tokenBcontract.mintApprove(user, governance, stakeAmount);
+    it("Should decrease the rewards reserve after claiming", async function () {
+      const {
+        users: [user],
+        governance,
+        gainzToken,
+        createPair,
+      } = await loadFixture(routerFixture);
+      const stakeAmount = parseEther("0.05");
+      const epochsLocked = 1080;
+      const nonce = 1;
+      const rewardAmount = parseEther("0.02");
 
-    //   // Stake to initiate position
-    //   await governance
-    //     .connect(user)
-    //     .stake(
-    //       { token: tokenB, nonce: 0, amount: stakeAmount },
-    //       epochsLocked,
-    //       [[tokenB], [tokenB, tokenA], []],
-    //       0,
-    //       0
-    //     );
+      // Setup: Mint and approve tokenB for staking
+      const [{ token: tokenA }, { token: tokenB }] = await createPair();
+      const tokenBcontract = await ethers.getContractAt("TestERC20", tokenB as Addressable);
+      await tokenBcontract.mintApprove(user, governance, stakeAmount);
 
-    //   // Act and Assert: Attempt to claim without rewards should revert
-    //   await expect(governance.connect(user).claimRewards(nonce)).to.be.revertedWith(
-    //     "Governance: No rewards to claim"
-    //   );
-    // });
+      // Stake to initiate rewards
+      await governance
+        .connect(user)
+        .stake({ token: tokenB, nonce: 0, amount: stakeAmount }, epochsLocked, [[tokenB], [tokenB, tokenA], []], 0, 0);
 
-    // it("Should decrease the rewards reserve after claiming", async function () {
-    //   const [user] = users;
-    //   const stakeAmount = parseEther("0.05");
-    //   const epochsLocked = 1080;
-    //   const nonce = 1;
-    //   const rewardAmount = parseEther("0.02");
+      // Add rewards to the reserve
+      await gainzToken.mint(governance, rewardAmount);
+      await governance.updateRewardReserve();
 
-    //   // Setup: Mint and approve tokenB for staking
-    //   const [{ token: tokenA }, { token: tokenB }] = await createPair();
-    //   const tokenBcontract = await ethers.getContractAt("TestERC20", tokenB as Addressable);
-    //   await tokenBcontract.mintApprove(user, governance, stakeAmount);
+      // Capture the initial rewards reserve
+      const reserveBefore = await governance.rewardsReserve();
 
-    //   // Stake to initiate rewards
-    //   await governance
-    //     .connect(user)
-    //     .stake(
-    //       { token: tokenB, nonce: 0, amount: stakeAmount },
-    //       epochsLocked,
-    //       [[tokenB], [tokenB, tokenA], []],
-    //       0,
-    //       0
-    //     );
+      // Act: Claim rewards
+      await governance.connect(user).claimRewards(nonce);
 
-    //   // Add rewards to the reserve
-    //   await gainzToken.mint(governance.address, rewardAmount);
-    //   await governance.updateRewardReserve(rewardAmount);
-
-    //   // Capture the initial rewards reserve
-    //   const reserveBefore = await governance.rewardsReserve();
-
-    //   // Act: Claim rewards
-    //   await governance.connect(user).claimRewards(nonce);
-
-    //   // Assert: Rewards reserve is reduced correctly
-    //   const reserveAfter = await governance.rewardsReserve();
-    //   expect(reserveBefore.sub(reserveAfter)).to.equal(rewardAmount);
-    // });
-
-    // it("Should update the user's reward attributes after claiming", async function () {
-    //   const [user] = users;
-    //   const stakeAmount = parseEther("0.05");
-    //   const epochsLocked = 1080;
-    //   const nonce = 1;
-    //   const rewardAmount = parseEther("0.02");
-
-    //   // Setup: Mint and approve tokenB for staking
-    //   const [{ token: tokenA }, { token: tokenB }] = await createPair();
-    //   const tokenBcontract = await ethers.getContractAt("TestERC20", tokenB as Addressable);
-    //   await tokenBcontract.mintApprove(user, governance, stakeAmount);
-
-    //   // Stake to initiate rewards
-    //   await governance
-    //     .connect(user)
-    //     .stake(
-    //       { token: tokenB, nonce: 0, amount: stakeAmount },
-    //       epochsLocked,
-    //       [[tokenB], [tokenB, tokenA], []],
-    //       0,
-    //       0
-    //     );
-
-    //   // Add rewards to the reserve
-    //   await gainzToken.mint(governance.address, rewardAmount);
-    //   await governance.updateRewardReserve(rewardAmount);
-
-    //   // Act: Claim rewards
-    //   await governance.connect(user).claimRewards(nonce);
-
-    //   // Assert: Check user's updated attributes
-    //   const { attributes } = await gToken.getBalanceAt(user, nonce);
-    //   expect(attributes.rewardPerShare).to.equal(await governance.rewardPerShare());
-    //   expect(attributes.lastClaimEpoch).to.equal(await governance.currentEpoch());
-    // });
-
-    // it("Should return the correct nonce after claiming rewards", async function () {
-    //   const [user] = users;
-    //   const stakeAmount = parseEther("0.05");
-    //   const epochsLocked = 1080;
-    //   const nonce = 1;
-    //   const rewardAmount = parseEther("0.02");
-
-    //   // Setup: Mint and approve tokenB for staking
-    //   const [{ token: tokenA }, { token: tokenB }] = await createPair();
-    //   const tokenBcontract = await ethers.getContractAt("TestERC20", tokenB as Addressable);
-    //   await tokenBcontract.mintApprove(user, governance, stakeAmount);
-
-    //   // Stake to initiate rewards
-    //   await governance
-    //     .connect(user)
-    //     .stake(
-    //       { token: tokenB, nonce: 0, amount: stakeAmount },
-    //       epochsLocked,
-    //       [[tokenB], [tokenB, tokenA], []],
-    //       0,
-    //       0
-    //     );
-
-    //   // Add rewards to the reserve
-    //   await gainzToken.mint(governance.address, rewardAmount);
-    //   await governance.updateRewardReserve(rewardAmount);
-
-    //   // Act: Claim rewards
-    //   const returnedNonce = await governance.connect(user).claimRewards(nonce);
-
-    //   // Assert: Returned nonce matches
-    //   expect(returnedNonce).to.equal(nonce);
-    // });
+      // Assert: Rewards reserve is reduced correctly
+      const reserveAfter = await governance.rewardsReserve();
+      expect(reserveBefore - reserveAfter).to.equal(rewardAmount-1n);
+    });
   });
 
   describe("unStake", function () {
