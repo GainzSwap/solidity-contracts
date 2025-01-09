@@ -253,9 +253,9 @@ contract GToken is SFT {
 			hasSFT(user, nonce) || isOperator(msg.sender),
 			"Caller not authorized"
 		);
-
 		GTokenLib.Attributes memory attributes = getBalanceAt(user, nonce)
 			.attributes;
+
 		GTokenLib.Attributes[] memory splitAttributes = attributes.split(
 			liquidityPortions
 		);

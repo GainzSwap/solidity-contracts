@@ -9,6 +9,8 @@ import { ERC1155HolderUpgradeable } from "@openzeppelin/contracts-upgradeable/to
 import { TokenPayment, TokenPayments } from "./libraries/TokenPayments.sol";
 import { GToken } from "./tokens/GToken/GToken.sol";
 
+import "hardhat/console.sol";
+
 /**
  * @title LaunchPair
  * @dev This contract facilitates the creation and management of crowdfunding campaigns for launching new tokens. Participants contribute funds to campaigns, and if the campaign is successful, they receive launchPair tokens in return. If the campaign fails, their contributions are refunded.
@@ -218,7 +220,10 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		uint256 _duration,
 		uint256 _campaignId
 	) external onlyCreator(_campaignId) {
-		require(_goal > 0 && _duration > 0, "Invalid input");
+		require(
+			_goal > 0 && _duration > 0 && _duration <= 30 days,
+			"Invalid input"
+		);
 		MainStorage storage $ = _getMainStorage();
 
 		Campaign storage campaign = $.campaigns[_campaignId];

@@ -10,10 +10,3 @@ struct LiquidityInfo {
 	uint256 liqValue;
 	address pair;
 }
-
-function createLiquidityInfoArray(
-	LiquidityInfo memory element
-) pure returns (LiquidityInfo[] memory array) {
-	array = new LiquidityInfo[](1);
-	array[0] = element;
-}

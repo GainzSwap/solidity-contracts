@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { TokenPayment } from "../../libraries/TokenPayments.sol";
 import { Math } from "../../libraries/Math.sol";
+import { FullMath } from "../../libraries/FullMath.sol";
 
 import "../../types.sol";
 
@@ -59,14 +60,29 @@ library GTokenLib {
 		// Initialize the array to store split `Attributes` structs
 		splitAttributes = new Attributes[](liquidityPortions.length);
 
-		uint256 portionSum;
+		uint256 liquiditySum;
 		uint256 liqValueSum;
+
+		// Determine the maximum value in liquidityPortions to calculate a scaling factor
+		uint256 maxPortion = 0;
+		for (uint256 i = 0; i < liquidityPortions.length; i++) {
+			if (liquidityPortions[i] > maxPortion) {
+				maxPortion = liquidityPortions[i];
+			}
+		}
+
+		// Scale down if necessary to avoid overflow
+		uint256 scaleFactor = (maxPortion >
+			type(uint256).max / self.lpDetails.liqValue)
+			? maxPortion
+			: 1;
 
 		// Loop through each portion and split attributes
 		for (uint256 i = 0; i < liquidityPortions.length; i++) {
 			uint256 splitLiquidity = liquidityPortions[i];
-			uint256 liqValue = (splitLiquidity * self.lpDetails.liqValue) /
-				self.lpDetails.liquidity;
+			uint256 scaledLiquidity = splitLiquidity / scaleFactor;
+			uint256 liqValue = (scaledLiquidity * self.lpDetails.liqValue) /
+				(self.lpDetails.liquidity / scaleFactor);
 
 			splitAttributes[i] = computeStakeWeight(
 				Attributes({
@@ -85,14 +101,17 @@ library GTokenLib {
 				})
 			);
 
-			portionSum += splitAttributes[i].lpDetails.liquidity;
+			liquiditySum += splitAttributes[i].lpDetails.liquidity;
 			liqValueSum += splitAttributes[i].lpDetails.liqValue;
 		}
 
-		// last portion gets un used liqValue, if any
-		splitAttributes[splitAttributes.length - 1].lpDetails.liqValue +=
+		// Handle unused liqValue and liquidity for the first portion
+		splitAttributes[0].lpDetails.liqValue +=
 			self.lpDetails.liqValue -
 			liqValueSum;
+		splitAttributes[0].lpDetails.liquidity +=
+			self.lpDetails.liquidity -
+			liquiditySum;
 
 		return splitAttributes;
 	}
