@@ -743,7 +743,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
 		(, uint256 rpsToAdd) = _addGainzMint(
-			Gainz($.gainzToken).gainzToEmit(),
+			Gainz($.gainzToken).stakersGainzToEmit(),
 			GToken($.gtoken).totalStakeWeight()
 		);
 

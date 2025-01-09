@@ -85,7 +85,7 @@ contract GToken is SFT {
 				stakeWeight: 0,
 				lpDetails: lpDetails
 			})
-			.computeStakeWeight();
+			.computeStakeWeight(currentEpoch);
 
 		// Mint the GToken with the specified attributes and return the token ID
 		return _mint(to, attributes.supply(), abi.encode(attributes));
@@ -96,7 +96,9 @@ contract GToken is SFT {
 		uint256 nonce,
 		GTokenLib.Attributes memory attr
 	) external canUpdate returns (uint256) {
-		attr = attr.computeStakeWeight();
+		attr = attr.computeStakeWeight(
+			_getGTokenStorage().epochs.currentEpoch()
+		);
 		return super.update(user, nonce, attr.supply(), abi.encode(attr));
 	}
 
@@ -140,12 +142,9 @@ contract GToken is SFT {
 			attr,
 			(GTokenLib.Attributes)
 		);
-		uint256 epochsLeft = attrUnpacked.epochsLeft(
-			attrUnpacked.epochsElapsed(
-				_getGTokenStorage().epochs.currentEpoch()
-			)
+		uint256 votePower = attrUnpacked.votePower(
+			_getGTokenStorage().epochs.currentEpoch()
 		);
-		uint256 votePower = attrUnpacked.votePower(epochsLeft);
 
 		return
 			GTokenBalance({
@@ -250,14 +249,15 @@ contract GToken is SFT {
 		address user = addresses[0];
 
 		require(
-			hasSFT(user, nonce) || isOperator(msg.sender),
+			hasSFT(msg.sender, nonce) || isOperator(msg.sender),
 			"Caller not authorized"
 		);
 		GTokenLib.Attributes memory attributes = getBalanceAt(user, nonce)
 			.attributes;
 
 		GTokenLib.Attributes[] memory splitAttributes = attributes.split(
-			liquidityPortions
+			liquidityPortions,
+			_getGTokenStorage().epochs.currentEpoch()
 		);
 
 		splitNonces = new uint256[](splitAttributes.length);

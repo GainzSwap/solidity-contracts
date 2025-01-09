@@ -167,4 +167,16 @@ library Entities {
 		self.staking += rhs.staking;
 		self.liqIncentive += rhs.liqIncentive;
 	}
+
+	function addReturn(
+		Value memory self,
+		Value memory rhs
+	) internal pure returns (Value memory) {
+		self.team += rhs.team;
+		self.growth += rhs.growth;
+		self.staking += rhs.staking;
+		self.liqIncentive += rhs.liqIncentive;
+
+		return self;
+	}
 }

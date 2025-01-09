@@ -26,7 +26,7 @@ contract GTokenLibFuzzTest is Test {
 			vm.expectRevert("GToken: Stake weight overflow");
 		}
 
-		GTokenLib.Attributes memory result = attributes.computeStakeWeight();
+		GTokenLib.Attributes memory result = attributes.computeStakeWeight(0);
 
 		if (liqValue <= type(uint256).max / epochsLocked) {
 			assertEq(
@@ -57,7 +57,8 @@ contract GTokenLibFuzzTest is Test {
 		vm.assume(portionsSum > 0); // Ensure valid input
 
 		GTokenLib.Attributes[] memory splits = attributes.split(
-			liquidityPortions
+			liquidityPortions,
+			0
 		);
 
 		uint256 totalLiquidity;

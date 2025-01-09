@@ -201,9 +201,6 @@ contract Gainz is
 		} else if (entityName == keccak256(abi.encodePacked("liqIncentive"))) {
 			amt = $.entityFunds.liqIncentive;
 			$.entityFunds.liqIncentive = 0;
-		} else if (entityName == keccak256(abi.encodePacked("staking"))) {
-			amt = $.entityFunds.staking;
-			$.entityFunds.staking = 0;
 		}
 
 		if (amt > 0) {
@@ -211,7 +208,13 @@ contract Gainz is
 		}
 	}
 
-	function gainzToEmit() public view returns (uint toEmit) {
+	// Stakers gainz
+	function stakersGainzToEmit() public view returns (uint toEmit) {
 		(, toEmit) = _generateEmission();
+
+		toEmit = Entities
+			.fromTotalValue(toEmit)
+			.addReturn(_getGainzERC20Storage().entityFunds)
+			.staking;
 	}
 }

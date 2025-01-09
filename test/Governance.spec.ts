@@ -1,10 +1,9 @@
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { claimRewardsFixture, routerFixture } from "./shared/fixtures";
 import { expect } from "chai";
-import { Addressable, AddressLike, BigNumberish, parseEther, ZeroAddress } from "ethers";
+import { Addressable, AddressLike, parseEther, ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
-import { getPairProxyAddress } from "./shared/utilities";
-import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { days } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 
 describe("Governance", function () {
   it("deploys governance", async () => {
@@ -177,6 +176,55 @@ describe("Governance", function () {
       expect((await gToken.getBalanceAt(user, nonce + 1)).attributes.rewardPerShare).to.eq(
         await governance.rewardPerShare(),
       );
+    });
+
+    it("Should damping rewards on frequent claiming", async function () {
+      const {
+        users: [, , , , user, user1, user2],
+        governance,
+        gainzToken,
+        gToken,
+        createPair,
+      } = await loadFixture(routerFixture);
+      const stakeAmount = parseEther("0.05");
+      const epochsLocked = 1080;
+
+      // Setup: Mint and approve tokenB for staking
+      const [{ token: tokenA }, { token: tokenB }] = await createPair();
+      const tokenBcontract = await ethers.getContractAt("TestERC20", tokenB as Addressable);
+
+      // Stake to initiate rewards
+      await tokenBcontract.mintApprove(user, governance, stakeAmount);
+      await governance
+        .connect(user)
+        .stake({ token: tokenB, nonce: 0, amount: stakeAmount }, epochsLocked, [[tokenB], [tokenB, tokenA], []], 0, 0);
+
+      await gToken.connect(user).split(1, [user, user1, user2], [0, 500, 500]);
+
+      const checkBalance = async (type: "more" | "equal") => {
+        const user1Bal = await gainzToken.balanceOf(user1);
+        const user2Bal = await gainzToken.balanceOf(user2);
+
+        if (type == "equal") {
+          expect(user1Bal).to.eq(user2Bal);
+        } else {
+          expect(user2Bal).to.gt(user1Bal);
+        }
+      };
+
+      // Act: Claim rewards
+      await checkBalance("equal");
+      let count = 0;
+      while (count < 15) {
+        await governance.connect(user1).claimRewards((await gToken.getNonces(user1))[0]);
+        await time.increase(days(1));
+        count++;
+      }
+
+      await governance.connect(user2).claimRewards((await gToken.getNonces(user2))[0]);
+      await governance.connect(user1).claimRewards((await gToken.getNonces(user1))[0]);
+
+      await checkBalance("more");
     });
 
     // it("Should revert if there are no rewards to claim", async function () {

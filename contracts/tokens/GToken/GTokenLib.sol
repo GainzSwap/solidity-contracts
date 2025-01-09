@@ -31,7 +31,8 @@ library GTokenLib {
 	/// @param self The Attributes struct of the participant.
 	/// @return The updated Attributes struct with the computed stake weight.
 	function computeStakeWeight(
-		Attributes memory self
+		Attributes memory self,
+		uint256 currentEpoch
 	) internal pure returns (Attributes memory) {
 		uint256 epochsLocked = self.epochsLocked;
 		require(
@@ -44,7 +45,7 @@ library GTokenLib {
 		}
 
 		// Calculate stake weight based on supply and epochs locked
-		self.stakeWeight = self.lpDetails.liqValue * epochsLocked;
+		self.stakeWeight = votePower(self, currentEpoch);
 
 		return self;
 	}
@@ -55,7 +56,8 @@ library GTokenLib {
 	/// @return splitAttributes An array of new `Attributes` structs with the allocated portions.
 	function split(
 		Attributes memory self,
-		uint256[] memory liquidityPortions
+		uint256[] memory liquidityPortions,
+		uint256 currentEpoch
 	) internal pure returns (Attributes[] memory splitAttributes) {
 		// Initialize the array to store split `Attributes` structs
 		splitAttributes = new Attributes[](liquidityPortions.length);
@@ -63,19 +65,22 @@ library GTokenLib {
 		uint256 liquiditySum;
 		uint256 liqValueSum;
 
-		// Determine the maximum value in liquidityPortions to calculate a scaling factor
-		uint256 maxPortion = 0;
-		for (uint256 i = 0; i < liquidityPortions.length; i++) {
-			if (liquidityPortions[i] > maxPortion) {
-				maxPortion = liquidityPortions[i];
+		uint256 scaleFactor;
+		{
+			// Determine the maximum value in liquidityPortions to calculate a scaling factor
+			uint256 maxPortion = 0;
+			for (uint256 i = 0; i < liquidityPortions.length; i++) {
+				if (liquidityPortions[i] > maxPortion) {
+					maxPortion = liquidityPortions[i];
+				}
 			}
-		}
 
-		// Scale down if necessary to avoid overflow
-		uint256 scaleFactor = (maxPortion >
-			type(uint256).max / self.lpDetails.liqValue)
-			? maxPortion
-			: 1;
+			// Scale down if necessary to avoid overflow
+			scaleFactor = (maxPortion >
+				type(uint256).max / self.lpDetails.liqValue)
+				? maxPortion
+				: 1;
+		}
 
 		// Loop through each portion and split attributes
 		for (uint256 i = 0; i < liquidityPortions.length; i++) {
@@ -98,7 +103,8 @@ library GTokenLib {
 						liquidity: splitLiquidity,
 						liqValue: liqValue
 					})
-				})
+				}),
+				currentEpoch
 			);
 
 			liquiditySum += splitAttributes[i].lpDetails.liquidity;
@@ -160,7 +166,7 @@ library GTokenLib {
 		uint256 xPow = (MAX_EPOCHS_LOCK - epochsLeft(self, currentEpoch)) ** 2;
 		uint256 mPow = MAX_EPOCHS_LOCK ** 2;
 
-		uint256 voteWeight = ((9 * xPow) / mPow) + 1;
+		uint256 voteWeight = ((9e8 * (mPow - xPow)) / mPow) + 1e8;
 
 		return self.lpDetails.liqValue * voteWeight;
 	}
