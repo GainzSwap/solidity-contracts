@@ -7,7 +7,8 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { ERC1155HolderUpgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
 
 import { TokenPayment, TokenPayments } from "./libraries/TokenPayments.sol";
-import { GToken } from "./tokens/GToken/GToken.sol";
+import { GToken, GTokenBalance } from "./tokens/GToken/GToken.sol";
+import { FullMath } from "./libraries/FullMath.sol";
 
 import "hardhat/console.sol";
 
@@ -221,7 +222,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		uint256 _campaignId
 	) external onlyCreator(_campaignId) {
 		require(
-			_goal > 0 && _duration > 0 && _duration <= 30 days,
+			_goal > 0 && _duration > 0 && _duration <= 180 days,
 			"Invalid input"
 		);
 		MainStorage storage $ = _getMainStorage();
@@ -252,7 +253,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 	function contribute(
 		uint256 _campaignId
 	) external payable campaignExists(_campaignId) isNotExpired(_campaignId) {
-		require(msg.value > 0, "Contribution must be greater than 0");
+		require(msg.value >= 150e18, "Minimum contribution is 150");
 		MainStorage storage $ = _getMainStorage();
 
 		Campaign storage campaign = $.campaigns[_campaignId];
@@ -303,8 +304,13 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 	}
 
 	/**
-	 * @dev Withdraw launchPair tokens after a successful campaign.
-	 * @param _campaignId The ID of the campaign to withdraw tokens from.
+	 * @dev Allows a participant to withdraw their share of launchPair tokens
+	 *      after a campaign successfully meets its goals.
+	 * @param _campaignId The unique identifier of the campaign.
+	 * Requirements:
+	 * - The campaign must exist.
+	 * - The campaign must have achieved its funding goal.
+	 * - The sender must be a participant in the specified campaign.
 	 */
 	function withdrawLaunchPairToken(
 		uint256 _campaignId
@@ -315,44 +321,74 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		isCampaignParticipant(msg.sender, _campaignId)
 	{
 		MainStorage storage $ = _getMainStorage();
-
 		Campaign storage campaign = $.campaigns[_campaignId];
+
 		require(
 			campaign.status == CampaignStatus.Success,
-			"Campaign is not successful"
+			"Campaign must be successful to withdraw tokens"
 		);
 
-		uint256 gTokenShare;
+		uint256 userLiqShare;
+
 		{
-			uint256 gTokenBalance = $
-				.gToken
-				.getBalanceAt(address(this), campaign.gtokenNonce)
-				.amount;
+			// Fetch total liquidity from the campaign's gToken nonce.
+			GTokenBalance memory gTokenBalance = $.gToken.getBalanceAt(
+				address(this),
+				campaign.gtokenNonce
+			);
 
+			require(
+				gTokenBalance.attributes.lpDetails.liquidity > 0,
+				"No liquidity available for distribution"
+			);
+
+			// Calculate user's liquidity share based on contribution proportion.
 			uint256 contribution = $.contributions[_campaignId][msg.sender];
-			gTokenShare = (contribution * gTokenBalance) / campaign.fundsRaised;
+			require(
+				contribution > 0,
+				"No contributions from sender in this campaign"
+			);
+			uint256 unUsedContributions = gTokenBalance
+				.attributes
+				.lpDetails
+				.liqValue * 2;
+			assert(
+				contribution <= unUsedContributions &&
+					unUsedContributions <= campaign.fundsRaised
+			);
 
+			userLiqShare = FullMath.mulDiv(
+				contribution,
+				gTokenBalance.attributes.lpDetails.liquidity,
+				unUsedContributions
+			);
+
+			// Split the liquidity between the contract and the user.
 			address[] memory addresses = new address[](2);
 			uint256[] memory portions = new uint256[](2);
 
 			addresses[0] = address(this);
-			portions[0] = gTokenBalance - gTokenShare;
+			portions[0] =
+				gTokenBalance.attributes.lpDetails.liquidity -
+				userLiqShare;
 
 			addresses[1] = msg.sender;
-			portions[1] = gTokenShare;
+			portions[1] = userLiqShare;
 
 			uint256[] memory nonces = $.gToken.split(
 				campaign.gtokenNonce,
 				addresses,
 				portions
 			);
+
+			// Update the campaign's gToken nonce with the remaining contract liquidity.
 			campaign.gtokenNonce = nonces[0];
 		}
 
-		// Remove the campaign from the user's participated campaigns after token withdrawal
+		// Remove the campaign from the user's participation list.
 		_removeCampaignFromUserCampaigns(msg.sender, _campaignId);
 
-		emit TokensDistributed(_campaignId, msg.sender, gTokenShare);
+		emit TokensDistributed(_campaignId, msg.sender, userLiqShare);
 	}
 
 	/**
