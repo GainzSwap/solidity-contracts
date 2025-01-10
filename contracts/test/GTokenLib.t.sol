@@ -162,18 +162,17 @@ contract GTokenLibFuzzTest is Test {
 		uint256 epochsLocked,
 		uint256 currentEpoch
 	) public pure {
-		vm.assume(epochsLocked <= GTokenLib.MAX_EPOCHS_LOCK);
+		vm.assume(
+			epochsLocked > 0 && epochsLocked <= GTokenLib.MAX_EPOCHS_LOCK
+		);
+		vm.assume(liqValue <= type(uint104).max);
 
 		GTokenLib.Attributes memory attributes = _createAttributes(
 			liqValue,
 			epochsLocked
 		);
 
-		currentEpoch = bound(
-			currentEpoch,
-			attributes.epochStaked,
-			attributes.epochStaked + epochsLocked
-		);
+		vm.assume(currentEpoch >= attributes.epochStaked + epochsLocked);
 
 		uint256 valueToKeep = attributes.valueToKeep(liqValue, currentEpoch);
 

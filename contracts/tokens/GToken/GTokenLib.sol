@@ -189,11 +189,10 @@ library GTokenLib {
 		uint256 value,
 		uint256 currentEpoch
 	) internal pure returns (uint256) {
-		// prevent division by 0
 		require(self.epochsLocked > 0, "GTokenLib: INVALID_EPOCHS_LOCKED");
 
-		// Calculate percentage loss based on epochs locked
-		uint256 epochsLockedPercentLoss = Math.linearInterpolation(
+		// Calculate percentage loss based on the epochs locked
+		uint256 lockPeriodPercentLoss = Math.linearInterpolation(
 			MIN_EPOCHS_LOCK,
 			MAX_EPOCHS_LOCK,
 			self.epochsLocked,
@@ -201,14 +200,17 @@ library GTokenLib {
 			MAX_EPOCHS_LOCK_PERCENT_LOSS
 		);
 
-		// Calculate the percentage of the value to keep after penalties
-		uint256 percentLost = epochsElapsedPercentLoss(
+		// Calculate percentage of value lost based on elapsed epochs
+		uint256 elapsedPercentLoss = epochsElapsedPercentLoss(
 			epochsElapsed(self, currentEpoch),
-			epochsLockedPercentLoss,
+			lockPeriodPercentLoss,
 			self.epochsLocked
 		);
 
-		uint256 percentToKeep = MAX_PERCENT_LOSS - percentLost;
+		// Determine the remaining percentage of value to keep
+		uint256 percentToKeep = MAX_PERCENT_LOSS - elapsedPercentLoss;
+
+		// Apply the calculated percentage to the total value
 		return (value * percentToKeep) / MAX_PERCENT_LOSS;
 	}
 
@@ -231,7 +233,12 @@ library GTokenLib {
 		uint256 lockedPercentLoss,
 		uint256 locked
 	) private pure returns (uint256) {
-		uint256 remainingTime = elapsed > locked ? 0 : locked - elapsed;
+		if (elapsed >= locked) {
+			return 0;
+		}
+
+		// Calculate percentage loss based on remaining epochs
+		uint256 remainingTime = locked - elapsed;
 
 		return
 			Math.linearInterpolation(

@@ -118,10 +118,7 @@ library GovernanceLib {
 		uint256 liquidity = attributes.lpDetails.liquidity;
 		uint256 liquidityToReturn = attributes.epochsLocked == 0
 			? liquidity
-			: attributes.valueToKeep(
-				liquidity,
-				attributes.epochsElapsed($.epochs.currentEpoch())
-			);
+			: attributes.valueToKeep(liquidity, $.epochs.currentEpoch());
 
 		Pair pair = Pair(
 			PriceOracle(OracleLibrary.oracleAddress($.router)).pairFor(
