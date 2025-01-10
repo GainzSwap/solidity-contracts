@@ -29,7 +29,6 @@ contract GTokenTest is Test {
 	function testMintGToken(
 		uint256 rewardPerShare,
 		uint256 epochsLocked,
-		uint256 currentEpoch,
 		uint256 liquidity,
 		uint256 liqValue
 	) public {
@@ -50,7 +49,6 @@ contract GTokenTest is Test {
 			user,
 			rewardPerShare,
 			epochsLocked,
-			currentEpoch,
 			lpDetails
 		);
 		vm.stopPrank();
@@ -84,7 +82,6 @@ contract GTokenTest is Test {
 			user,
 			rewardPerShare,
 			epochsLocked,
-			0,
 			lpDetails
 		);
 		vm.stopPrank();
@@ -121,8 +118,8 @@ contract GTokenTest is Test {
 	}
 
 	function testSplit(uint256 liquidity, uint112 liqValue) public {
-		vm.assume(liquidity > 0 );
-		vm.assume(liqValue > 0 );
+		vm.assume(liquidity > 0);
+		vm.assume(liqValue > 0);
 
 		LiquidityInfo memory lpDetails = LiquidityInfo({
 			token0: address(this),
@@ -133,7 +130,7 @@ contract GTokenTest is Test {
 		});
 
 		vm.startPrank(owner);
-		uint256 tokenId = gToken.mintGToken(user, 1, 100, 0, lpDetails);
+		uint256 tokenId = gToken.mintGToken(user, 1, 100, lpDetails);
 		vm.stopPrank();
 
 		address[] memory addresses = new address[](2);
@@ -199,7 +196,7 @@ contract GTokenTest is Test {
 		});
 
 		vm.startPrank(owner);
-		gToken.mintGToken(user, rewardPerShare, epochsLocked, 0, lpDetails);
+		gToken.mintGToken(user, rewardPerShare, epochsLocked, lpDetails);
 		vm.stopPrank();
 
 		assertEq(

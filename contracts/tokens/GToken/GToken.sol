@@ -58,17 +58,17 @@ contract GToken is SFT {
 	/// @param to The address that will receive the minted GToken.
 	/// @param rewardPerShare The reward per share at the time of minting.
 	/// @param epochsLocked The number of epochs for which the GTokens are locked.
-	/// @param currentEpoch The current epoch when the GToken is minted.
 	/// @param lpDetails An LiquidityInfo struct representing the GToken payment.
 	/// @return uint256 The token ID of the newly minted GToken.
 	function mintGToken(
 		address to,
 		uint256 rewardPerShare,
 		uint256 epochsLocked,
-		uint256 currentEpoch,
 		LiquidityInfo memory lpDetails
 	) external canUpdate returns (uint256) {
-		if (_getGTokenStorage().epochs.currentEpoch() <= 180) {
+		uint256 currentEpoch = _getGTokenStorage().epochs.currentEpoch();
+
+		if (currentEpoch <= 180) {
 			require(
 				epochsLocked >= 180,
 				"GToken: INVALID_GENESIS_PERIOD_EPOCHS_LOCK"

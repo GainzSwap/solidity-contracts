@@ -507,7 +507,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 				msg.sender,
 				$.rewardPerShare,
 				epochsLocked,
-				$.epochs.currentEpoch(),
 				liqInfo
 			);
 	}
@@ -672,7 +671,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			address(this),
 			$.rewardPerShare,
 			GTokenLib.MAX_EPOCHS_LOCK,
-			$.epochs.currentEpoch(),
 			LiquidityInfo({
 				pair: pair,
 				liquidity: liquidity,
