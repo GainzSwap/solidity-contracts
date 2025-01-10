@@ -70,39 +70,6 @@ library GovernanceLib {
 			payment.amount >= MIN_LIQ_VALUE_FOR_LISTING;
 	}
 
-	function addReward(
-		Governance.GovernanceStorage storage $,
-		TokenPayment calldata payment
-	) public {
-		uint256 rewardAmount = payment.amount;
-		require(
-			rewardAmount > 0,
-			"Governance: Reward amount must be greater than zero"
-		);
-		require(
-			payment.token == $.gainzToken,
-			"Governance: Invalid reward payment"
-		);
-		payment.receiveTokenFor(msg.sender, address(this), $.wNativeToken);
-
-		uint256 protocolAmount;
-		(rewardAmount, protocolAmount) = rewardAmount.take(
-			(rewardAmount * 3) / 10
-		); // 30% for protocol fee
-
-		uint256 totalStakeWeight = GToken($.gtoken).totalStakeWeight();
-		if (totalStakeWeight > 0) {
-			$.rewardPerShare += FullMath.mulDiv(
-				rewardAmount,
-				FixedPoint128.Q128,
-				totalStakeWeight
-			);
-		}
-
-		$.protocolFees += protocolAmount;
-		$.rewardsReserve += rewardAmount;
-	}
-
 	function _calculateClaimableReward(
 		address user,
 		uint256 nonce,
@@ -331,7 +298,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		Epochs.Storage memory _epochs,
 		address gainzToken,
 		address wNativeToken,
-		address protocolFeesCollector_,
 		address proxyAdmin
 	) public initializer {
 		address router = msg.sender;
@@ -353,12 +319,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		$.gainzToken = gainzToken;
 
 		$.launchPair = DeployLaunchPair.newLaunchPair($.gtoken, proxyAdmin);
-
-		require(
-			protocolFeesCollector_ != address(0),
-			"Invalid Protocol Fees collector"
-		);
-		$.protocolFeesCollector = protocolFeesCollector_;
 	}
 
 	error InvalidPayment(TokenPayment payment, uint256 value);
@@ -710,14 +670,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			securityPayment,
 			tradeTokenPayment
 		);
-	}
-
-	function protocolFees() public view returns (uint256) {
-		return _getGovernanceStorage().protocolFees;
-	}
-
-	function gtoken() public view returns (address) {
-		return _getGovernanceStorage().gtoken;
 	}
 
 	// ******* VIEWS *******
