@@ -75,12 +75,13 @@ async function saveLibraries(libraries: Record<string, string>, contractName: st
   if (network.name == "hardhat") return;
 
   const libPath = `verification/libs/${network.name}/${contractName}.js`;
+  const dir = path.dirname(libPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 
   // Convert the object to a JSON string with indentation for readability
   const jsonString = JSON.stringify(libraries, null, 2);
-
-  // Define the file path where the object will be saved
-  const filePath = path.join(__dirname, "../verification/libs/neox/Router.js");
 
   // Write the JSON string to the file
   fs.writeFile(libPath, `module.exports = ${jsonString};\n`, "utf8", err => {

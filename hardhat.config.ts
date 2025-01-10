@@ -54,7 +54,7 @@ const config: HardhatUserConfig = {
       mining: { auto: true, interval: 12_000 },
       accounts: { accountsBalance: "50000000000000000000000000", count: 30 },
     },
-    opencampus: {
+    "edu-testnet": {
       url: "https://rpc.open-campus-codex.gelato.digital",
       accounts: [deployerPrivateKey],
     },
