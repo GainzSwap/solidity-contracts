@@ -20,7 +20,10 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
 
   console.log("\nLaunching Pair", { gainzAddress, wNativeToken }, "\n\n");
 
-  const lpAmount = (await gainz.balanceOf(deployer)) - parseEther("2,100,000".replace(/,/g, ""));
+  const publicSale = parseEther((2_100_000).toString());
+  const privateSale = parseEther((1_470_000).toString());
+
+  const lpAmount = (await gainz.balanceOf(deployer)) - publicSale - privateSale;
   const goal = parseEther("768,150.1".replace(/,/g, ""));
 
   await gainz.approve(governance, lpAmount);
