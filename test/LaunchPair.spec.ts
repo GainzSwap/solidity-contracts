@@ -76,7 +76,7 @@ describe("LaunchPair", function () {
 
       await expect(launchPair.connect(creator).startCampaign(0, 3600, 1)).to.be.revertedWith("Invalid input");
 
-      await expect(launchPair.connect(creator).startCampaign(ethers.parseEther("10"), 0, 1)).to.be.revertedWith(
+      await expect(launchPair.connect(creator).startCampaign(ethers.parseEther("100000"), 0, 1)).to.be.revertedWith(
         "Invalid input",
       );
     });
@@ -87,30 +87,30 @@ describe("LaunchPair", function () {
       const { launchPair, creator, contributor1, contributor2 } = await loadFixture(deployLaunchPairFixture);
 
       await launchPair.createCampaign(creator.address);
-      await launchPair.connect(creator).startCampaign(ethers.parseEther("10"), 3600, 1);
+      await launchPair.connect(creator).startCampaign(ethers.parseEther("100000"), 3600, 1);
 
-      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("2") });
+      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("200") });
 
-      await launchPair.connect(contributor2).contribute(1, { value: ethers.parseEther("3") });
+      await launchPair.connect(contributor2).contribute(1, { value: ethers.parseEther("300") });
 
       const campaign = await launchPair.getCampaignDetails(1);
-      expect(campaign.fundsRaised).to.equal(ethers.parseEther("5"));
+      expect(campaign.fundsRaised).to.equal(ethers.parseEther("500"));
 
       const contribution1 = await launchPair.contributions(1, contributor1.address);
-      expect(contribution1).to.equal(ethers.parseEther("2"));
+      expect(contribution1).to.equal(ethers.parseEther("200"));
 
       const contribution2 = await launchPair.contributions(1, contributor2.address);
-      expect(contribution2).to.equal(ethers.parseEther("3"));
+      expect(contribution2).to.equal(ethers.parseEther("300"));
     });
 
-    it("Should revert if the contribution is zero", async function () {
+    it("Should revert if the contribution is low", async function () {
       const { launchPair, creator, contributor1 } = await loadFixture(deployLaunchPairFixture);
 
       await launchPair.createCampaign(creator.address);
-      await launchPair.connect(creator).startCampaign(ethers.parseEther("10"), 3600, 1);
+      await launchPair.connect(creator).startCampaign(ethers.parseEther("100000"), 3600, 1);
 
-      await expect(launchPair.connect(contributor1).contribute(1, { value: 0 })).to.be.revertedWith(
-        "Contribution must be greater than 0",
+      await expect(launchPair.connect(contributor1).contribute(1, { value: 10 })).to.be.revertedWith(
+        "Minimum contribution is 150",
       );
     });
 
@@ -118,7 +118,7 @@ describe("LaunchPair", function () {
       const { launchPair, creator, contributor1 } = await loadFixture(deployLaunchPairFixture);
 
       await launchPair.createCampaign(creator.address);
-      await launchPair.connect(creator).startCampaign(ethers.parseEther("10"), 1, 1);
+      await launchPair.connect(creator).startCampaign(ethers.parseEther("100000"), 1, 1);
 
       await time.increase(2);
 
@@ -133,22 +133,22 @@ describe("LaunchPair", function () {
       const { launchPair, creator, contributor1, contributor2, owner } = await loadFixture(deployLaunchPairFixture);
 
       await launchPair.createCampaign(creator.address);
-      await launchPair.connect(creator).startCampaign(ethers.parseEther("10"), 3600, 1);
+      await launchPair.connect(creator).startCampaign(ethers.parseEther("1000"), 3600, 1);
 
-      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("5") });
-      await launchPair.connect(contributor2).contribute(1, { value: ethers.parseEther("5") });
+      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("500") });
+      await launchPair.connect(contributor2).contribute(1, { value: ethers.parseEther("500") });
 
       const ownerBalanceBefore = await ethers.provider.getBalance(owner.address);
 
       await launchPair.withdrawFunds(1);
       const campaign = await launchPair.getCampaignDetails(1);
 
-      expect(campaign.fundsRaised).to.equal(ethers.parseEther("10"));
+      expect(campaign.fundsRaised).to.equal(ethers.parseEther("1000"));
       expect(campaign.status).to.equal(3); // Success status
 
       const ownerBalanceAfter = await ethers.provider.getBalance(owner.address);
       expect(ownerBalanceAfter - ownerBalanceBefore).to.approximately(
-        ethers.parseEther("10"),
+        ethers.parseEther("1000"),
         ethers.parseEther("0.0001"),
         "Balance should be this value, but since gas fees have to be paid, it some what is not exact",
       );
@@ -158,9 +158,9 @@ describe("LaunchPair", function () {
       const { launchPair, creator, contributor1 } = await loadFixture(deployLaunchPairFixture);
 
       await launchPair.createCampaign(creator.address);
-      await launchPair.connect(creator).startCampaign(ethers.parseEther("10"), 3600, 1);
+      await launchPair.connect(creator).startCampaign(ethers.parseEther("10000"), 3600, 1);
 
-      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("2") });
+      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("150") });
 
       await expect(launchPair.withdrawFunds(1)).to.be.revertedWith("Goal not met");
     });
@@ -169,10 +169,10 @@ describe("LaunchPair", function () {
       const { launchPair, creator, contributor1, contributor2 } = await loadFixture(deployLaunchPairFixture);
 
       await launchPair.createCampaign(creator.address);
-      await launchPair.connect(creator).startCampaign(ethers.parseEther("10"), 3600, 1);
+      await launchPair.connect(creator).startCampaign(ethers.parseEther("1000"), 3600, 1);
 
-      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("5") });
-      await launchPair.connect(contributor2).contribute(1, { value: ethers.parseEther("5") });
+      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("500") });
+      await launchPair.connect(contributor2).contribute(1, { value: ethers.parseEther("500") });
 
       await launchPair.withdrawFunds(1);
 
@@ -185,9 +185,9 @@ describe("LaunchPair", function () {
       const { launchPair, creator, contributor1 } = await loadFixture(deployLaunchPairFixture);
 
       await launchPair.createCampaign(creator.address);
-      await launchPair.connect(creator).startCampaign(ethers.parseEther("10"), 3600, 1);
+      await launchPair.connect(creator).startCampaign(ethers.parseEther("100000"), 3600, 1);
 
-      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("2") });
+      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("200") });
 
       // Simulate campaign failure by advancing time past the deadline
       await time.increase(3601);
@@ -202,10 +202,10 @@ describe("LaunchPair", function () {
       const { launchPair, creator, contributor1, contributor2 } = await loadFixture(deployLaunchPairFixture);
 
       await launchPair.createCampaign(creator.address);
-      await launchPair.connect(creator).startCampaign(ethers.parseEther("10"), 3600, 1);
+      await launchPair.connect(creator).startCampaign(ethers.parseEther("100000"), 3600, 1);
 
-      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("5") });
-      await launchPair.connect(contributor2).contribute(1, { value: ethers.parseEther("5") });
+      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("500") });
+      await launchPair.connect(contributor2).contribute(1, { value: ethers.parseEther("500") });
 
       await expect(launchPair.connect(contributor1).getRefunded(1)).to.be.revertedWith("Refund not available");
     });
@@ -214,9 +214,9 @@ describe("LaunchPair", function () {
       const { launchPair, creator, contributor1, contributor2 } = await loadFixture(deployLaunchPairFixture);
 
       await launchPair.createCampaign(creator.address);
-      await launchPair.connect(creator).startCampaign(ethers.parseEther("10"), 3600, 1);
+      await launchPair.connect(creator).startCampaign(ethers.parseEther("100000"), 3600, 1);
 
-      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("5") });
+      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("500") });
 
       // Simulate campaign failure by advancing time past the deadline
       await time.increase(3601);
@@ -245,8 +245,8 @@ describe("LaunchPair", function () {
       const { launchPair, creator, contributor1 } = await loadFixture(deployLaunchPairFixture);
 
       await launchPair.createCampaign(creator.address);
-      await launchPair.connect(creator).startCampaign(ethers.parseEther("10"), 3600, 1);
-      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("2") });
+      await launchPair.connect(creator).startCampaign(ethers.parseEther("100000"), 3600, 1);
+      await launchPair.connect(contributor1).contribute(1, { value: ethers.parseEther("200") });
 
       const campaigns = await Promise.all((await launchPair.getActiveCampaigns()).map(id => launchPair.campaigns(id)));
 

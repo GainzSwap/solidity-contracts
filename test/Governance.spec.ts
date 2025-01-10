@@ -227,7 +227,6 @@ describe("Governance", function () {
       await checkBalance("more");
     });
 
-
     it("Should decrease the rewards reserve after claiming", async function () {
       const {
         users: [user],
@@ -262,7 +261,7 @@ describe("Governance", function () {
 
       // Assert: Rewards reserve is reduced correctly
       const reserveAfter = await governance.rewardsReserve();
-      expect(reserveBefore - reserveAfter).to.equal(rewardAmount-1n);
+      expect(reserveBefore - reserveAfter).to.equal(rewardAmount - 1n);
     });
   });
 
@@ -536,10 +535,10 @@ describe("Governance", function () {
 
       const { campaignId, securityGTokenPayment } = await governance.pairListing(pairOwner);
       expect(campaignId).to.be.gt(0);
-      await launchPairContract.connect(pairOwner).startCampaign(parseEther("0.000345"), 3600, campaignId);
+      await launchPairContract.connect(pairOwner).startCampaign(parseEther((49_000_000).toString()), 3600, campaignId);
       const campaign = await launchPairContract.campaigns(campaignId);
 
-      await launchPairContract.connect(lpHaunter1).contribute(campaignId, { value: campaign.goal / 2n });
+      await launchPairContract.connect(lpHaunter1).contribute(campaignId, { value: parseEther("150") });
       await launchPairContract.connect(lpHaunter2).contribute(campaignId, { value: campaign.goal });
 
       await time.increase(30 * 3600);
@@ -550,20 +549,23 @@ describe("Governance", function () {
         (await gToken.getGTokenBalance(pairOwner)).find(token => token.nonce == securityGTokenPayment.nonce)?.nonce,
       ).to.eq(securityGTokenPayment.nonce, "Security GToken should be returned back to pair owner");
 
-      // This will create pair and activate trading
-      // await governance.connect(pairOwner).progressNewPairListing();
-      // expect((await router.tradeableTokens()).includes(tradeTokenPayment.token)).to.equal(
-      //   true,
-      //   "tradeTokenPayment token should be listed",
-      // );
-
+      const campaignInitalGtoken = await gToken.getBalanceAt(
+        launchPairContract,
+        (await launchPairContract.getCampaignDetails(campaignId)).gtokenNonce,
+      );
       expect((await gToken.getNonces(lpHaunter1)).length + (await gToken.getNonces(lpHaunter2)).length).to.eq(0);
       await launchPairContract.connect(lpHaunter1).withdrawLaunchPairToken(campaignId);
       await launchPairContract.connect(lpHaunter2).withdrawLaunchPairToken(campaignId);
-      expect((await gToken.getNonces(lpHaunter1)).length + (await gToken.getNonces(lpHaunter2)).length).to.eq(2);
 
-      const campaignAfter = await launchPairContract.getCampaignDetails(campaignId);
-      expect(campaignAfter.gtokenNonce).to.be.gt(0);
+      const withdrawnGTokenAmounts = (
+        await Promise.all(
+          [lpHaunter1, lpHaunter2].map(async hunter =>
+            (await gToken.getGTokenBalance(hunter)).reduce((totalBal, bal) => totalBal + bal.amount, 0n),
+          ),
+        )
+      ).reduce((sum, amt) => sum + amt);
+
+      expect(Number(withdrawnGTokenAmounts)).to.eq(Number(campaignInitalGtoken.amount));
     });
   });
 });
