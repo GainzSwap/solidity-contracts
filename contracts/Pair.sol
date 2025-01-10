@@ -247,7 +247,7 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		uint amount1Out,
 		uint feePercent1,
 		address to
-	) external lock {
+	) external lock onlyOwner {
 		require(
 			amount0Out > 0 || amount1Out > 0,
 			"GainzSwap: INSUFFICIENT_OUTPUT_AMOUNT"
@@ -332,7 +332,7 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 	function calculateFeePercent(
 		uint256 amount,
 		uint256 reserve
-	) public view returns (uint256 feePercent) {
+	) public view returns (uint256) {
 		(uint256 reserve0, uint256 reserve1, ) = getReserves();
 
 		require(
@@ -342,16 +342,23 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 
 		(uint256 minFeePercent, uint256 maxFeePercent) = feePercents();
 
-		uint256 totalLiquidty = totalSupply() -
-			balanceOf(ISwapFactory(_getPairStorage().router).feeTo());
-		uint256 liquidity = (amount * totalLiquidty) / reserve;
+		// Calculate the reserve gap
+		uint256 reserveGap = (reserve == reserve0 && reserve0 > reserve1)
+			? reserve0 - reserve1
+			: (reserve == reserve1 && reserve1 > reserve0)
+			? reserve1 - reserve0
+			: 0;
 
-		feePercent =
-			minFeePercent +
+		uint256 totalLiquidity = totalSupply();
+		// - balanceOf(ISwapFactory(_getPairStorage().router).feeTo());
+
+		uint256 liquidity = ((amount + reserveGap) * totalLiquidity) / reserve;
+
+		// Calculate feePercent and bound it to minFeePercent and maxFeePercent
+		uint256 feePercent = minFeePercent +
 			(liquidity * (maxFeePercent - minFeePercent)) /
-			totalLiquidty;
+			totalLiquidity;
 
-		// Bounds the feePercent to the minFee and maxFee
 		return feePercent > maxFeePercent ? maxFeePercent : feePercent;
 	}
 
