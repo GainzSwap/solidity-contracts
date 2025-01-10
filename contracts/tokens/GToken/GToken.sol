@@ -248,10 +248,7 @@ contract GToken is SFT {
 
 		address user = addresses[0];
 
-		require(
-			hasSFT(msg.sender, nonce) || isOperator(msg.sender),
-			"Caller not authorized"
-		);
+		require(hasSFT(msg.sender, nonce), "Caller not authorized");
 		GTokenLib.Attributes memory attributes = getBalanceAt(user, nonce)
 			.attributes;
 
@@ -262,11 +259,13 @@ contract GToken is SFT {
 
 		splitNonces = new uint256[](splitAttributes.length);
 		for (uint256 i = 0; i < splitAttributes.length; i++) {
-			splitNonces[i] = _mint(
-				addresses[i],
-				splitAttributes[i].supply(),
-				abi.encode(splitAttributes[i])
-			);
+			uint256 amount = splitAttributes[i].supply();
+			if (amount > 0)
+				splitNonces[i] = _mint(
+					addresses[i],
+					amount,
+					abi.encode(splitAttributes[i])
+				);
 		}
 
 		// Burn the original token after splitting
