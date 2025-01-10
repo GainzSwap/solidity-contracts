@@ -88,7 +88,6 @@ library GTokenLib {
 			uint256 scaledLiquidity = splitLiquidity / scaleFactor;
 			uint256 liqValue = (scaledLiquidity * self.lpDetails.liqValue) /
 				(self.lpDetails.liquidity / scaleFactor);
-
 			splitAttributes[i] = computeStakeWeight(
 				Attributes({
 					rewardPerShare: self.rewardPerShare,
@@ -111,7 +110,7 @@ library GTokenLib {
 			liqValueSum += splitAttributes[i].lpDetails.liqValue;
 		}
 
-		// Handle unused liqValue and liquidity for the first portion
+		// Handle unused liqValue and liquidity for the first portion, also checks invariants
 		splitAttributes[0].lpDetails.liqValue +=
 			self.lpDetails.liqValue -
 			liqValueSum;
