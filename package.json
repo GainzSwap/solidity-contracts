@@ -19,7 +19,7 @@
     "verify": "hardhat etherscan-verify"
   },
   "dependencies": {
-    "@nomicfoundation/hardhat-toolbox": "~5.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@openzeppelin/contracts": "~5.0.2",
     "@openzeppelin/contracts-upgradeable": "~5.0.2",
     "@typechain/ethers-v6": "~0.5.1",
@@ -56,7 +56,7 @@
     "hardhat": "~2.22.10",
     "hardhat-deploy": "~0.12.4",
     "hardhat-deploy-ethers": "~0.4.2",
-    "hardhat-gas-reporter": "~2.2.1",
+    "hardhat-gas-reporter": "^1.0.8",
     "prettier": "~3.3.3",
     "prettier-plugin-solidity": "^1.4.1",
     "solidity-coverage": "~0.8.13",
