@@ -346,8 +346,8 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		uint256 reserveGap = (reserve == reserve0 && reserve0 > reserve1)
 			? reserve0 - reserve1
 			: (reserve == reserve1 && reserve1 > reserve0)
-			? reserve1 - reserve0
-			: 0;
+				? reserve1 - reserve0
+				: 0;
 
 		uint256 totalLiquidity = totalSupply();
 		// - balanceOf(ISwapFactory(_getPairStorage().router).feeTo());

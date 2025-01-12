@@ -16,7 +16,7 @@ contract LaunchPairTest is Test {
 	address private participant = address(3);
 
 	function setUp() public {
-        owner = address(new Governance());
+		owner = address(new Governance());
 		vm.startPrank(owner);
 		gToken = new GToken();
 		launchPair = new LaunchPair();
@@ -194,7 +194,7 @@ contract LaunchPairTest is Test {
 		LaunchPair.Campaign memory campaign = launchPair.getCampaignDetails(
 			campaignId
 		);
-		assert(campaign.status== LaunchPair.CampaignStatus.Failed);
+		assert(campaign.status == LaunchPair.CampaignStatus.Failed);
 		vm.stopPrank();
 	}
 }
