@@ -68,6 +68,10 @@ const config: HardhatUserConfig = {
       accounts: [deployerPrivateKey],
       gasPrice: 40e9,
     },
+    educhain: {
+      url: "https://rpc.edu-chain.raas.gelato.cloud",
+      accounts: [deployerPrivateKey],
+    },
   },
   // configuration for harhdat-verify plugin
   etherscan: {
