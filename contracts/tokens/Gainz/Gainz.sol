@@ -12,6 +12,8 @@ import { Epochs } from "../../libraries/Epochs.sol";
 
 import { Router } from "../../Router.sol";
 
+import "../../types.sol";
+
 /**
  * @title Gainz
  * @dev ERC20Upgradeable token representing the Academy-DEX base token. This token is mintable only upon deployment,
@@ -60,7 +62,7 @@ contract Gainz is
 		_mint(address(this), GainzInfo.ECOSYSTEM_DISTRIBUTION_FUNDS);
 	}
 
-	function runInit(address governance) external {
+	function runInit(address governance) external onlyOwner {
 		GainzERC20Storage storage $ = _getGainzERC20Storage(); // Access namespaced storage
 		require(governance != address(0), "Invalid Address");
 
@@ -70,7 +72,7 @@ contract Gainz is
 			abi.encodeWithSignature("epochs()")
 		);
 
-		require(success, "Invalid Governance");
+		require(success && epochData.length > 0, "Invalid Governance Call");
 		$.epochs = abi.decode(epochData, (Epochs.Storage));
 	}
 
@@ -81,7 +83,7 @@ contract Gainz is
 	) internal view returns (uint256) {
 		require(
 			currentTimestamp > lastTimestamp,
-			"Router._computeEdgeEmissions: Invalid currentTimestamp"
+			"Gainz._computeEdgeEmissions: Invalid currentTimestamp"
 		);
 
 		GainzERC20Storage storage $ = _getGainzERC20Storage(); // Access namespaced storage
@@ -109,7 +111,7 @@ contract Gainz is
 				: endTimestamp;
 			lowerBoundTime = lastTimestamp;
 		} else {
-			revert("Router._computeEdgeEmissions: Invalid timestamps");
+			revert("Gainz._computeEdgeEmissions: Invalid timestamps");
 		}
 
 		return
@@ -187,24 +189,23 @@ contract Gainz is
 	function sendGainz(
 		address to,
 		string memory _entityName
-	) external onlyOwner {
+	) external onlyOwner returns (uint256 amount) {
 		GainzERC20Storage storage $ = _getGainzERC20Storage();
 		bytes32 entityName = keccak256(abi.encodePacked(_entityName));
 
-		uint amt;
 		if (entityName == keccak256(abi.encodePacked("team"))) {
-			amt = $.entityFunds.team;
+			amount = $.entityFunds.team;
 			$.entityFunds.team = 0;
 		} else if (entityName == keccak256(abi.encodePacked("growth"))) {
-			amt = $.entityFunds.growth;
+			amount = $.entityFunds.growth;
 			$.entityFunds.growth = 0;
 		} else if (entityName == keccak256(abi.encodePacked("liqIncentive"))) {
-			amt = $.entityFunds.liqIncentive;
+			amount = $.entityFunds.liqIncentive;
 			$.entityFunds.liqIncentive = 0;
 		}
 
-		if (amt > 0) {
-			_transfer(address(this), to, amt);
+		if (amount > 0) {
+			_transfer(address(this), to, amount);
 		}
 	}
 
