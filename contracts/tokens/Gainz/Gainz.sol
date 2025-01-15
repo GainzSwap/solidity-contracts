@@ -147,10 +147,10 @@ contract Gainz is
 					lastGenerateEpoch -
 					1;
 
-				if (intermediateEpochs > 1) {
+				if (intermediateEpochs > 0) {
 					_gainzToEmit += GainzEmission.throughEpochRange(
-						lastGenerateEpoch,
-						lastGenerateEpoch + intermediateEpochs
+						lastGenerateEpoch + 1,
+						currentEpoch
 					);
 				}
 
