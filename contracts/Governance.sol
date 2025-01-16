@@ -567,7 +567,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 		// Ensure that a valid listing exists after the potential refresh.
 		require(
-			listing.owner != address(0) && listing.campaignId > 0,
+			listing.owner == msg.sender && listing.campaignId > 0,
 			"No listing found"
 		);
 
