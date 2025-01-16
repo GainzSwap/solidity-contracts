@@ -57,8 +57,7 @@ contract GTokenLibFuzzTest is Test {
 		vm.assume(portionsSum > 0); // Ensure valid input
 
 		GTokenLib.Attributes[] memory splits = attributes.split(
-			liquidityPortions,
-			0
+			liquidityPortions
 		);
 
 		uint256 totalLiquidity;

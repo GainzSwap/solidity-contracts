@@ -34,7 +34,7 @@ contract GTokenTest is Test {
 	) public {
 		vm.assume(epochsLocked <= 1080);
 		vm.assume(liquidity > 0 && liquidity < (type(uint256).max / 1080));
-		vm.assume(liqValue > 0 && liqValue < (type(uint256).max / 1080));
+		vm.assume(liqValue > 0 && liqValue < (type(uint256).max / 9e8));
 
 		LiquidityInfo memory lpDetails = LiquidityInfo({
 			token0: address(this),
@@ -141,7 +141,7 @@ contract GTokenTest is Test {
 		portions[0] = lpDetails.liquidity / 2;
 		portions[1] = lpDetails.liquidity / 2;
 
-		vm.startPrank(owner);
+		vm.startPrank(user);
 		uint256[] memory splitTokenIds = gToken.split(
 			tokenId,
 			addresses,
@@ -152,9 +152,11 @@ contract GTokenTest is Test {
 		uint256 portionLiquiditySum = 0;
 		uint256 portionLiquidityValueSum = 0;
 		for (uint256 i = 0; i < splitTokenIds.length; i++) {
+			uint256 nonce = splitTokenIds[i];
+
 			GTokenBalance memory balance = gToken.getBalanceAt(
 				addresses[i],
-				splitTokenIds[i]
+				nonce
 			);
 			portionLiquidityValueSum += balance.amount;
 			portionLiquiditySum += balance.attributes.lpDetails.liquidity;

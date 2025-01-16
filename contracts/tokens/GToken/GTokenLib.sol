@@ -56,14 +56,14 @@ library GTokenLib {
 	/// @return splitAttributes An array of new `Attributes` structs with the allocated portions.
 	function split(
 		Attributes memory self,
-		uint256[] memory liquidityPortions,
-		uint256 currentEpoch
+		uint256[] memory liquidityPortions
 	) internal pure returns (Attributes[] memory splitAttributes) {
 		// Initialize the array to store split `Attributes` structs
 		splitAttributes = new Attributes[](liquidityPortions.length);
 
 		uint256 liquiditySum;
 		uint256 liqValueSum;
+		uint256 stakeWeightSum;
 
 		uint256 scaleFactor;
 		{
@@ -85,29 +85,33 @@ library GTokenLib {
 		// Loop through each portion and split attributes
 		for (uint256 i = 0; i < liquidityPortions.length; i++) {
 			uint256 splitLiquidity = liquidityPortions[i];
-			uint256 scaledLiquidity = splitLiquidity / scaleFactor;
-			uint256 liqValue = (scaledLiquidity * self.lpDetails.liqValue) /
-				(self.lpDetails.liquidity / scaleFactor);
-			splitAttributes[i] = computeStakeWeight(
-				Attributes({
-					rewardPerShare: self.rewardPerShare,
-					epochStaked: self.epochStaked,
-					epochsLocked: self.epochsLocked,
-					lastClaimEpoch: self.lastClaimEpoch,
-					stakeWeight: 0,
-					lpDetails: LiquidityInfo({
-						token0: self.lpDetails.token0,
-						token1: self.lpDetails.token1,
-						pair: self.lpDetails.pair,
-						liquidity: splitLiquidity,
-						liqValue: liqValue
-					})
-				}),
-				currentEpoch
+			require(
+				splitLiquidity + liquiditySum <= self.lpDetails.liquidity,
+				"Invalid Liquidity Portions"
 			);
+
+			uint256 scaledLiquidity = splitLiquidity / scaleFactor;
+
+			splitAttributes[i] = Attributes({
+				rewardPerShare: self.rewardPerShare,
+				epochStaked: self.epochStaked,
+				epochsLocked: self.epochsLocked,
+				lastClaimEpoch: self.lastClaimEpoch,
+				stakeWeight: (scaledLiquidity * self.stakeWeight) /
+					(self.lpDetails.liquidity / scaleFactor),
+				lpDetails: LiquidityInfo({
+					token0: self.lpDetails.token0,
+					token1: self.lpDetails.token1,
+					pair: self.lpDetails.pair,
+					liquidity: splitLiquidity,
+					liqValue: (scaledLiquidity * self.lpDetails.liqValue) /
+						(self.lpDetails.liquidity / scaleFactor)
+				})
+			});
 
 			liquiditySum += splitAttributes[i].lpDetails.liquidity;
 			liqValueSum += splitAttributes[i].lpDetails.liqValue;
+			stakeWeightSum += splitAttributes[i].stakeWeight;
 		}
 
 		// Handle unused liqValue and liquidity for the first portion, also checks invariants
@@ -117,6 +121,7 @@ library GTokenLib {
 		splitAttributes[0].lpDetails.liquidity +=
 			self.lpDetails.liquidity -
 			liquiditySum;
+		splitAttributes[0].stakeWeight += self.stakeWeight - stakeWeightSum;
 
 		return splitAttributes;
 	}
@@ -133,9 +138,6 @@ library GTokenLib {
 		Attributes memory self,
 		uint256 currentEpoch
 	) internal pure returns (uint256) {
-		if (currentEpoch <= self.epochStaked) {
-			return 0;
-		}
 		return currentEpoch - self.epochStaked;
 	}
 
@@ -165,7 +167,7 @@ library GTokenLib {
 		uint256 xPow = (MAX_EPOCHS_LOCK - epochsLeft(self, currentEpoch)) ** 2;
 		uint256 mPow = MAX_EPOCHS_LOCK ** 2;
 
-		uint256 voteWeight = ((9e8 * (mPow - xPow)) / mPow) + 1e8;
+		uint256 voteWeight = ((9e6 * (mPow - xPow)) / mPow) + 1e6;
 
 		return self.lpDetails.liqValue * voteWeight;
 	}

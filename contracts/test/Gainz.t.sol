@@ -16,14 +16,14 @@ contract GainzTest is Test, RouterFixture {
 
 	function testFuzz_mintGainz(
 		string memory entity,
-		uint256 timestampIncrement,
+		uint256 timestamp,
 		address entityAddress
 	) public {
 		gainz.runInit(address(governance));
-		
+
 		// Arrange
-		vm.assume(timestampIncrement > 0 && timestampIncrement < 360 days); // Ensure a realistic range
-		vm.warp(timestampIncrement);
+		vm.assume(timestamp > 0 && timestamp < 360 days); // Ensure a realistic range
+		vm.warp(timestamp);
 
 		// Act
 		uint256 emittedGainz = gainz.stakersGainzToEmit();

@@ -33,8 +33,8 @@ contract Handler is CommonBase, StdUtils {
 	uint256 public ghost_governaceGainzBal;
 
 	function mintGainz(uint256 timestampIncrement, address caller) public {
-		vm.assume(timestampIncrement < 1080 days);
-		vm.warp(timestampIncrement);
+		vm.assume(timestampIncrement < 10 days);
+		vm.warp(block.timestamp + timestampIncrement);
 		vm.prank(caller);
 
 		ghost_governaceGainzBal += gainz.stakersGainzToEmit();
