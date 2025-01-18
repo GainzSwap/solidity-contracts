@@ -8,7 +8,7 @@ import fundCampaign from "./fundCampaign";
 import claimRewards from "./claimRewards";
 
 task("runE2ELocalnet", "").setAction(async (_, hre) => {
-  const actions = [fundCampaign, stake, swap, claimRewards];
+  const actions = [fundCampaign];
   const accounts = await hre.ethers.getSigners();
 
   while (true) {

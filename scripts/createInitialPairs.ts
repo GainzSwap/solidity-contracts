@@ -38,5 +38,5 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
 
   const { campaignId } = await governance.pairListing(deployer);
 
-  await launchPair.startCampaign(minRaise, days(30), campaignId);
+  await launchPair.startCampaign(minRaise, days(53), campaignId);
 });
