@@ -24,7 +24,7 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
   const privateSale = parseEther((1_470_000).toString());
 
   const lpAmount = (await gainz.balanceOf(deployer)) - publicSale - privateSale;
-  const goal = parseEther("768,150.1".replace(/,/g, ""));
+  const minRaise = parseEther("262,636.5".replace(/,/g, ""));
 
   await gainz.approve(governance, lpAmount);
 
@@ -38,5 +38,5 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
 
   const { campaignId } = await governance.pairListing(deployer);
 
-  await launchPair.startCampaign(goal, days(30), campaignId);
+  await launchPair.startCampaign(minRaise, days(30), campaignId);
 });
