@@ -8,6 +8,8 @@ import { ERC1155HolderUpgradeable } from "@openzeppelin/contracts-upgradeable/to
 
 import { TokenPayment, TokenPayments } from "./libraries/TokenPayments.sol";
 import { GToken, GTokenBalance } from "./tokens/GToken/GToken.sol";
+import { Router } from "./Router.sol";
+import { Governance } from "./Governance.sol";
 import { FullMath } from "./libraries/FullMath.sol";
 
 import "hardhat/console.sol";
@@ -252,7 +254,8 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 	 * @param _campaignId The ID of the campaign to contribute to.
 	 */
 	function contribute(
-		uint256 _campaignId
+		uint256 _campaignId,
+		uint256 referrerId
 	) external payable campaignExists(_campaignId) isNotExpired(_campaignId) {
 		require(msg.value >= 1e18, "Minimum contribution is 1");
 		MainStorage storage $ = _getMainStorage();
@@ -273,6 +276,11 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		}
 
 		emit ContributionMade(_campaignId, msg.sender, weiAmount);
+
+		Router(payable(Governance(payable(owner())).getRouter())).register(
+			msg.sender,
+			referrerId
+		);
 	}
 
 	/**

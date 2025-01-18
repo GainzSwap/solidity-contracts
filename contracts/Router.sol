@@ -372,6 +372,17 @@ contract Router is
 		}
 	}
 
+	function register(address user, uint256 referrerId) external {
+		assert(
+			msg.sender ==
+				address(
+					Governance(payable(_getRouterStorage().governance))
+						.launchPair()
+				)
+		);
+		_createOrGetUserId(user, referrerId);
+	}
+
 	function swapExactTokensForTokens(
 		uint amountIn,
 		uint amountOutMin,

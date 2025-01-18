@@ -714,6 +714,10 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		return _getGovernanceStorage().epochs;
 	}
 
+	function getRouter() public view returns (address) {
+		return _getGovernanceStorage().router;
+	}
+
 	function minLiqValueForListing() public pure returns (uint256) {
 		return MIN_LIQ_VALUE_FOR_LISTING;
 	}

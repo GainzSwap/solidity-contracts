@@ -90,7 +90,7 @@ contract LaunchPairTest is Test {
 		vm.stopPrank();
 
 		vm.startPrank(participant);
-		launchPair.contribute{ value: contributionAmount }(campaignId);
+		launchPair.contribute{ value: contributionAmount }(campaignId, 0);
 
 		uint256 userContribution = launchPair.contributions(
 			campaignId,
@@ -122,7 +122,7 @@ contract LaunchPairTest is Test {
 		vm.stopPrank();
 
 		vm.startPrank(participant);
-		launchPair.contribute{ value: contributionAmount }(campaignId);
+		launchPair.contribute{ value: contributionAmount }(campaignId, 0);
 		vm.stopPrank();
 
 		vm.startPrank(owner);
@@ -157,7 +157,7 @@ contract LaunchPairTest is Test {
 		vm.stopPrank();
 
 		vm.startPrank(participant);
-		launchPair.contribute{ value: contributionAmount }(campaignId);
+		launchPair.contribute{ value: contributionAmount }(campaignId, 0);
 		vm.stopPrank();
 
 		vm.startPrank(owner);
@@ -203,7 +203,7 @@ contract LaunchPairTest is Test {
 		vm.stopPrank();
 
 		vm.startPrank(participant);
-		launchPair.contribute{ value: contributionAmount }(campaignId);
+		launchPair.contribute{ value: contributionAmount }(campaignId, 0);
 		vm.stopPrank();
 
 		// Simulate campaign expiration
