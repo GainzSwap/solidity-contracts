@@ -12,14 +12,15 @@ contract GTokenLibFuzzTest is Test {
 		uint256 liqValue,
 		uint256 epochsLocked
 	) public {
-		GTokenLib.Attributes memory attributes = _createAttributes(
-			liqValue,
-			epochsLocked
-		);
 		epochsLocked = bound(
 			epochsLocked,
 			GTokenLib.MIN_EPOCHS_LOCK,
 			GTokenLib.MAX_EPOCHS_LOCK
+		);
+
+		GTokenLib.Attributes memory attributes = _createAttributes(
+			liqValue,
+			epochsLocked
 		);
 
 		if (liqValue > type(uint256).max / epochsLocked) {
@@ -105,17 +106,18 @@ contract GTokenLibFuzzTest is Test {
 		uint256 epochsLocked,
 		uint256 currentEpoch
 	) public pure {
+		currentEpoch = bound(
+			currentEpoch,
+			epochStaked,
+			epochStaked + epochsLocked
+		);
+		
 		GTokenLib.Attributes memory attributes = _createAttributes(
 			1,
 			epochsLocked
 		);
 		attributes.epochStaked = epochStaked;
 
-		currentEpoch = bound(
-			currentEpoch,
-			epochStaked,
-			epochStaked + epochsLocked
-		);
 
 		uint256 elapsed = attributes.epochsElapsed(currentEpoch);
 		uint256 left = attributes.epochsLeft(currentEpoch);

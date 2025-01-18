@@ -69,6 +69,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 	// Event emitted when tokens are distributed to a participant
 	event TokensDistributed(
 		uint256 indexed campaignId,
+		uint256 indexed gTokenNonce,
 		address indexed contributor,
 		uint256 amount
 	);
@@ -253,7 +254,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 	function contribute(
 		uint256 _campaignId
 	) external payable campaignExists(_campaignId) isNotExpired(_campaignId) {
-		require(msg.value >= 150e18, "Minimum contribution is 150");
+		require(msg.value >= 1e18, "Minimum contribution is 1");
 		MainStorage storage $ = _getMainStorage();
 
 		Campaign storage campaign = $.campaigns[_campaignId];
@@ -319,6 +320,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		campaignExists(_campaignId)
 		hasMetGoal(_campaignId)
 		isCampaignParticipant(msg.sender, _campaignId)
+		returns (uint256 gTokenNonce)
 	{
 		MainStorage storage $ = _getMainStorage();
 		Campaign storage campaign = $.campaigns[_campaignId];
@@ -348,10 +350,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 				contribution > 0,
 				"No contributions from sender in this campaign"
 			);
-			uint256 unUsedContributions = gTokenBalance
-				.attributes
-				.lpDetails
-				.liqValue * 2;
+			uint256 unUsedContributions = gTokenBalance.amount;
 			assert(
 				contribution <= unUsedContributions &&
 					unUsedContributions <= campaign.fundsRaised
@@ -383,12 +382,18 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 
 			// Update the campaign's gToken nonce with the remaining contract liquidity.
 			campaign.gtokenNonce = nonces[0];
+			gTokenNonce = nonces[1];
 		}
 
 		// Remove the campaign from the user's participation list.
 		_removeCampaignFromUserCampaigns(msg.sender, _campaignId);
 
-		emit TokensDistributed(_campaignId, msg.sender, userLiqShare);
+		emit TokensDistributed(
+			_campaignId,
+			gTokenNonce,
+			msg.sender,
+			userLiqShare
+		);
 	}
 
 	/**

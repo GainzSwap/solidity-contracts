@@ -454,7 +454,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 			// Compute the liquidity value
 			liqInfo.liqValue = payment.token == $.wNativeToken
-				? msg.value / 2
+				? msg.value
 				: _computeLiqValue($, paymentA, paymentB, paths[2]);
 		}
 
@@ -622,8 +622,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			})
 		);
 
-		uint liqValue = fundsRaised / 2;
-
 		uint256 gTokenNonce = GToken($.gtoken).mintGToken(
 			address(this),
 			$.rewardPerShare,
@@ -631,7 +629,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			LiquidityInfo({
 				pair: pair,
 				liquidity: liquidity,
-				liqValue: liqValue,
+				liqValue: fundsRaised,
 				token0: Pair(pair).token0(),
 				token1: Pair(pair).token1()
 			})

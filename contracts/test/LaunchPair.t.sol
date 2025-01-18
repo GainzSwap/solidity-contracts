@@ -3,9 +3,12 @@ pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
+
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
 import { LaunchPair, TokenPayment } from "../LaunchPair.sol";
-import { Governance } from "../Governance.sol";
-import { GToken } from "../tokens/GToken/GToken.sol";
+import { Governance, Epochs } from "../Governance.sol";
+import { GToken, LiquidityInfo } from "../tokens/GToken/GToken.sol";
 
 contract LaunchPairTest is Test {
 	LaunchPair private launchPair;
@@ -19,8 +22,21 @@ contract LaunchPairTest is Test {
 		owner = address(new Governance());
 		vm.startPrank(owner);
 		gToken = new GToken();
+		gToken.initialize(
+			Epochs.Storage({ genesis: block.timestamp, epochLength: 1 days }),
+			owner
+		);
 		launchPair = new LaunchPair();
 		launchPair.initialize(address(gToken));
+		vm.stopPrank();
+	}
+
+	function testOnlyOwnerCanCreateCampaign() public {
+		vm.startPrank(creator);
+		vm.expectPartialRevert(
+			OwnableUpgradeable.OwnableUnauthorizedAccount.selector
+		);
+		launchPair.createCampaign(creator);
 		vm.stopPrank();
 	}
 
@@ -62,7 +78,7 @@ contract LaunchPairTest is Test {
 	}
 
 	function testContribute(uint256 contributionAmount) public payable {
-		vm.assume(contributionAmount > 0);
+		vm.assume(contributionAmount > 1 ether);
 		vm.deal(participant, contributionAmount);
 
 		vm.startPrank(owner);
@@ -93,7 +109,7 @@ contract LaunchPairTest is Test {
 		uint256 goal,
 		uint256 contributionAmount
 	) public payable {
-		vm.assume(goal > 0);
+		vm.assume(goal > 1 ether);
 		vm.assume(contributionAmount >= goal);
 		vm.deal(participant, contributionAmount);
 
@@ -123,50 +139,59 @@ contract LaunchPairTest is Test {
 		vm.stopPrank();
 	}
 
-	// function testWithdrawLaunchPairToken(
-	// 	uint256 goal,
-	// 	uint256 contributionAmount
-	// ) public payable {
-	// 	vm.assume(goal > 0);
-	// 	vm.assume(contributionAmount >= goal);
-	// 	vm.deal(participant, contributionAmount);
+	function testWithdrawLaunchPairToken(
+		uint256 goal,
+		LiquidityInfo memory lpDetails
+	) public payable {
+		vm.assume(goal > 1 ether && goal <= 1_000_000_000 ether);
+		uint256 contributionAmount = goal;
 
-	// 	vm.startPrank(owner);
-	// 	uint256 campaignId = launchPair.createCampaign(creator);
-	// 	vm.stopPrank();
+		vm.deal(participant, contributionAmount);
 
-	// 	vm.startPrank(creator);
-	// 	launchPair.startCampaign(goal, 1 days, campaignId);
-	// 	vm.stopPrank();
+		vm.startPrank(owner);
+		uint256 campaignId = launchPair.createCampaign(creator);
+		vm.stopPrank();
 
-	// 	vm.startPrank(participant);
-	// 	launchPair.contribute{ value: contributionAmount }(campaignId);
-	// 	vm.stopPrank();
+		vm.startPrank(creator);
+		launchPair.startCampaign(goal, 1 days, campaignId);
+		vm.stopPrank();
 
-	// 	vm.startPrank(owner);
-	// 	gToken.mint(address(launchPair), 1, 100, "");
-	// 	launchPair.receiveGToken(
-	// 		TokenPayment(address(gToken), 100, 1),
-	// 		campaignId
-	// 	);
-	// 	vm.stopPrank();
+		vm.startPrank(participant);
+		launchPair.contribute{ value: contributionAmount }(campaignId);
+		vm.stopPrank();
 
-	// 	vm.startPrank(participant);
-	// 	launchPair.withdrawLaunchPairToken(campaignId);
+		vm.startPrank(owner);
+		launchPair.withdrawFunds(campaignId);
+		lpDetails.liqValue = contributionAmount;
+		lpDetails.liquidity = contributionAmount;
+		gToken.mintGToken(owner, 1, 1080, lpDetails);
+		gToken.setApprovalForAll(address(launchPair), true);
+		launchPair.receiveGToken(
+			TokenPayment(address(gToken), lpDetails.liqValue, 1),
+			campaignId
+		);
+		vm.stopPrank();
 
-	// 	LaunchPair.Campaign memory campaign = launchPair.getCampaignDetails(
-	// 		campaignId
-	// 	);
-	// 	assert(campaign.status== LaunchPair.CampaignStatus.Success);
-	// 	vm.stopPrank();
-	// }
+		vm.startPrank(participant);
+		vm.warp(block.timestamp + 3 days);
+		uint256 participantGTokenNonce = launchPair.withdrawLaunchPairToken(
+			campaignId
+		);
+
+		LaunchPair.Campaign memory campaign = launchPair.getCampaignDetails(
+			campaignId
+		);
+		assert(campaign.status == LaunchPair.CampaignStatus.Success);
+		assertTrue(gToken.hasSFT(participant, participantGTokenNonce));
+		vm.stopPrank();
+	}
 
 	function testRefund(
 		uint256 goal,
 		uint256 contributionAmount
 	) public payable {
 		vm.assume(goal > 0);
-		vm.assume(contributionAmount > 0 && contributionAmount < goal);
+		vm.assume(contributionAmount > 1 ether && contributionAmount < goal);
 		vm.deal(participant, contributionAmount);
 
 		vm.startPrank(owner);

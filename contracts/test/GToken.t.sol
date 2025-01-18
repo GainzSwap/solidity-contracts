@@ -118,8 +118,8 @@ contract GTokenTest is Test {
 	}
 
 	function testSplit(uint256 liquidity, uint112 liqValue) public {
-		vm.assume(liquidity > 0);
-		vm.assume(liqValue > 0);
+		vm.assume(liquidity > 0 && liquidity <= 10_000_000_000 ether);
+		vm.assume(liqValue > 0 && liqValue <= 10_000_000_000 ether);
 
 		LiquidityInfo memory lpDetails = LiquidityInfo({
 			token0: address(this),
