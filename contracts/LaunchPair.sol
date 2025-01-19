@@ -203,13 +203,14 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 				address($.gToken) == payment.token,
 			"LaunchPair: Invalid GToken received"
 		);
-		payment.receiveSFT();
 
 		Campaign storage campaign = $.campaigns[_campaignId];
 		require(
 			campaign.gtokenNonce == 0,
 			"Launchpair: Campaign received gToken already"
 		);
+
+		payment.receiveSFT();
 		campaign.gtokenNonce = payment.nonce;
 	}
 
@@ -260,13 +261,19 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		require(msg.value >= 1e18, "Minimum contribution is 1");
 		MainStorage storage $ = _getMainStorage();
 
+		Router router = Router(
+			payable(Governance(payable(owner())).getRouter())
+		);
+
+		uint256 weiAmount = msg.value;
+		payable(router.feeTo()).transfer(msg.value);
+
 		Campaign storage campaign = $.campaigns[_campaignId];
 		require(
 			campaign.status == CampaignStatus.Funding,
 			"Campaign is not in funding status"
 		);
 
-		uint256 weiAmount = msg.value;
 		campaign.fundsRaised += weiAmount;
 		$.contributions[_campaignId][msg.sender] += weiAmount;
 
@@ -275,12 +282,9 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 			$.userCampaigns[msg.sender].add(_campaignId);
 		}
 
-		emit ContributionMade(_campaignId, msg.sender, weiAmount);
+		router.register(msg.sender, referrerId);
 
-		Router(payable(Governance(payable(owner())).getRouter())).register(
-			msg.sender,
-			referrerId
-		);
+		emit ContributionMade(_campaignId, msg.sender, weiAmount);
 	}
 
 	/**
@@ -354,10 +358,12 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 
 			// Calculate user's liquidity share based on contribution proportion.
 			uint256 contribution = $.contributions[_campaignId][msg.sender];
+			$.contributions[_campaignId][msg.sender] = 0;
 			require(
 				contribution > 0,
 				"No contributions from sender in this campaign"
 			);
+
 			uint256 unUsedContributions = gTokenBalance.amount;
 			assert(
 				contribution <= unUsedContributions &&
