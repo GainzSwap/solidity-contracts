@@ -287,6 +287,17 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		emit ContributionMade(_campaignId, msg.sender, weiAmount);
 	}
 
+	function refundCampaign(
+		uint256 _campaignId
+	) external payable campaignExists(_campaignId) {
+		MainStorage storage $ = _getMainStorage();
+		Campaign storage campaign = $.campaigns[_campaignId];
+		
+		require(campaign.deadline < block.timestamp, "Campaign not ended");
+
+		require(campaign.fundsRaised == msg.value, "Mismatch");
+	}
+
 	/**
 	 * @dev Withdraw funds after the campaign successfully meets its goal.
 	 * @param _campaignId The ID of the campaign to withdraw funds from.

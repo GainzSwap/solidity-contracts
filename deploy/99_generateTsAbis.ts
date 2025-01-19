@@ -122,6 +122,21 @@ const generateTsAbis: DeployFunction = async function () {
   );
 
   console.log(`📝 Updated TypeScript contract definition file on ${TARGET_DIR}deployedContracts.ts`);
+
+  const PONDER_DIR = "../ponder/src/";
+  if (!fs.existsSync(PONDER_DIR)) {
+    fs.mkdirSync(PONDER_DIR);
+  }
+  fs.writeFileSync(
+    `${PONDER_DIR}contracts.ts`,
+    await prettier.format(
+      `${generatedContractComment}
+ export const deployedContracts = {${fileContent}} as const;`,
+      {
+        parser: "typescript",
+      },
+    ),
+  );
 };
 
 export default generateTsAbis;
