@@ -102,6 +102,45 @@ contract GToken is SFT {
 		return super.update(user, nonce, attr.supply(), abi.encode(attr));
 	}
 
+	/// @notice Splits a GToken into portions and distributes it to the specified addresses.
+	/// @dev If an address is the zero address, the allotted portion is burned.
+	/// This function can be called by the contract owner or the token's owner.
+	/// @param nonce The nonce of the GToken to split.
+	/// @param addresses An array of addresses to receive the split portions.
+	/// @param liquidityPortions An array of liquidityPortions representing the amounts to be split.
+	/// @return splitNonces An array of nonces for the newly minted split tokens.
+	function split(
+		uint256 nonce,
+		address[] calldata addresses,
+		uint256[] calldata liquidityPortions
+	) external returns (uint256[] memory splitNonces) {
+		require(
+			addresses.length > 0 &&
+				addresses.length == liquidityPortions.length,
+			"Invalid Addresses and portions"
+		);
+
+		GTokenLib.Attributes memory attributes = getBalanceAt(msg.sender, nonce)
+			.attributes;
+
+		GTokenLib.Attributes[] memory splitAttributes = attributes.split(
+			liquidityPortions
+		);
+
+		// Burn the original token
+		_burn(msg.sender, nonce, attributes.supply());
+
+		splitNonces = new uint256[](splitAttributes.length);
+		for (uint256 i = 0; i < splitAttributes.length; i++) {
+			uint256 amount = splitAttributes[i].supply();
+			splitNonces[i] = _mint(
+				addresses[i],
+				amount,
+				abi.encode(splitAttributes[i])
+			);
+		}
+	}
+
 	/**
 	 * @notice Retrieves the governance token balance and attributes for a specific user at a given nonce.
 	 * @dev This function checks if the user has a Semi-Fungible Token (SFT) at the provided nonce.
@@ -226,50 +265,6 @@ contract GToken is SFT {
 				$.pairSupply[attr.lpDetails.pair] -= supply;
 			}
 		}
-	}
-
-	/// @notice Splits a GToken into portions and distributes it to the specified addresses.
-	/// @dev If an address is the zero address, the allotted portion is burned.
-	/// This function can be called by the contract owner or the token's owner.
-	/// @param nonce The nonce of the GToken to split.
-	/// @param addresses An array of addresses to receive the split portions.
-	/// @param liquidityPortions An array of liquidityPortions representing the amounts to be split.
-	/// @return splitNonces An array of nonces for the newly minted split tokens.
-	function split(
-		uint256 nonce,
-		address[] calldata addresses,
-		uint256[] calldata liquidityPortions
-	) external returns (uint256[] memory splitNonces) {
-		require(
-			addresses.length > 0 &&
-				addresses.length == liquidityPortions.length,
-			"Invalid Addresses and portions"
-		);
-
-		address user = addresses[0];
-
-		require(hasSFT(msg.sender, nonce), "Caller not authorized");
-		GTokenLib.Attributes memory attributes = getBalanceAt(user, nonce)
-			.attributes;
-
-		GTokenLib.Attributes[] memory splitAttributes = attributes.split(
-			liquidityPortions,
-			_getGTokenStorage().epochs.currentEpoch()
-		);
-
-		splitNonces = new uint256[](splitAttributes.length);
-		for (uint256 i = 0; i < splitAttributes.length; i++) {
-			uint256 amount = splitAttributes[i].supply();
-			if (amount > 0)
-				splitNonces[i] = _mint(
-					addresses[i],
-					amount,
-					abi.encode(splitAttributes[i])
-				);
-		}
-
-		// Burn the original token after splitting
-		_burn(user, nonce, attributes.supply());
 	}
 
 	function pairSupply(address pair) public view returns (uint256) {

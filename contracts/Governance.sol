@@ -6,7 +6,7 @@ import { ERC1155HolderUpgradeable } from "@openzeppelin/contracts-upgradeable/to
 import { IERC20Metadata } from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import { TokenPayment, TokenPayments } from "./libraries/TokenPayments.sol";
 import { OracleLibrary } from "./libraries/OracleLibrary.sol";
@@ -30,7 +30,7 @@ import { LaunchPair } from "./LaunchPair.sol";
 import "./types.sol";
 import "./errors.sol";
 
-uint256 constant MIN_LIQ_VALUE_FOR_LISTING = 3_000e18;
+uint256 constant MIN_LIQ_VALUE_FOR_LISTING = 25_000e18;
 
 library GovernanceLib {
 	using Epochs for Epochs.Storage;
@@ -454,7 +454,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 			// Compute the liquidity value
 			liqInfo.liqValue = payment.token == $.wNativeToken
-				? msg.value / 2
+				? msg.value
 				: _computeLiqValue($, paymentA, paymentB, paths[2]);
 		}
 
@@ -567,7 +567,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 		// Ensure that a valid listing exists after the potential refresh.
 		require(
-			listing.owner != address(0) && listing.campaignId > 0,
+			listing.owner == msg.sender && listing.campaignId > 0,
 			"No listing found"
 		);
 
@@ -622,16 +622,14 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			})
 		);
 
-		uint liqValue = fundsRaised / 2;
-
 		uint256 gTokenNonce = GToken($.gtoken).mintGToken(
 			address(this),
 			$.rewardPerShare,
-			GTokenLib.MAX_EPOCHS_LOCK,
+			180,
 			LiquidityInfo({
 				pair: pair,
 				liquidity: liquidity,
-				liqValue: liqValue,
+				liqValue: fundsRaised,
 				token0: Pair(pair).token0(),
 				token1: Pair(pair).token1()
 			})
@@ -714,6 +712,10 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 	function epochs() public view returns (Epochs.Storage memory) {
 		return _getGovernanceStorage().epochs;
+	}
+
+	function getRouter() public view returns (address) {
+		return _getGovernanceStorage().router;
 	}
 
 	function minLiqValueForListing() public pure returns (uint256) {

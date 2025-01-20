@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "prb-math/contracts/PRBMathSD59x18.sol";
+import "../../types.sol";
 
 /// @notice Emitted when trying to convert a uint256 number that doesn't fit within int256.
 error ToInt256CastOverflow(uint256 number);
@@ -44,10 +45,10 @@ library GainzEmission {
 	using PRBMathSD59x18 for int256;
 
 	/// @dev The decay rate per epoch, represented with 18 decimals (0.9998).
-	int256 private constant DECAY_RATE = 9998e14;
+	int256 internal constant DECAY_RATE = 9998e14;
 
 	/// @dev Initial emission at epoch 0.
-	int256 private constant E0 = 2729727036845720116116;
+	int256 internal constant E0 = 2729727036845720116116;
 
 	/**
 	 * @notice Computes the emission at a specific epoch.
@@ -55,8 +56,7 @@ library GainzEmission {
 	 * @return The emission value at the given epoch.
 	 */
 	function atEpoch(uint256 epoch) internal pure returns (uint256) {
-		int256 decayFactor = PRBMathSD59x18.pow(DECAY_RATE, toInt256(epoch));
-		return toUint256((E0 * decayFactor) / 1e18);
+		return toUint256((E0 * epochDecayFactor(epoch)) / 1e18);
 	}
 
 	/**
@@ -71,7 +71,10 @@ library GainzEmission {
 		uint256 epochStart,
 		uint256 epochEnd
 	) internal pure returns (uint256) {
-		require(epochEnd > epochStart, "Invalid epoch range");
+		require(
+			epochEnd > epochStart,
+			"GainzEmission: epochEnd must be greater than epochStart"
+		);
 
 		int256 startFactor = epochDecayFactor(epochStart);
 		int256 endFactor = epochDecayFactor(epochEnd);
@@ -104,12 +107,7 @@ library GainzEmission {
 	 * @return The decay factor for the specified epoch.
 	 */
 	function epochDecayFactor(uint256 epoch) private pure returns (int256) {
-		return
-			PRBMathSD59x18.pow(
-				DECAY_RATE,
-				// Extrapolate epoch to size with decimal places of DECAY_RATE
-				toInt256(epoch) * 1e18
-			);
+		return PRBMathSD59x18.pow(DECAY_RATE, toInt256(epoch * 1e18)); // Multiplying by 1e18 for precission
 	}
 }
 
@@ -134,14 +132,17 @@ library Entities {
 	function fromTotalValue(
 		uint256 totalValue
 	) internal pure returns (Value memory) {
+		// Calculate the total value to be distributed among others (non-staking categories)
 		uint256 othersTotal = (totalValue * (UNITY - STAKING)) / UNITY;
-
+		// Calculate proportional allocation for each category
 		uint256 team = (othersTotal * TEAM) / UNITY;
 		uint256 growth = (othersTotal * GROWTH) / UNITY;
 		uint256 liqIncentive = (othersTotal * LIQ_INCENTIVE) / UNITY;
 
+		// Remaining value is allocated to staking
 		uint256 staking = totalValue - (team + growth + liqIncentive);
 
+		// Return the structured allocation
 		return
 			Value({
 				team: team,

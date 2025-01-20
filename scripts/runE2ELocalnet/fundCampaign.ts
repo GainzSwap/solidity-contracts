@@ -29,7 +29,8 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
           return BigInt(randBal) / 100_000n;
         });
 
-        await launchPair.connect(account).contribute(campaignId, { value: amount });
+        const referrerId = Math.floor(Math.random() * +(await router.totalUsers()).toString());
+        await launchPair.connect(account).contribute(campaignId, referrerId, { value: amount });
 
         console.log(`${account.address} funded campaign ${campaignId}`);
       } catch (error) {

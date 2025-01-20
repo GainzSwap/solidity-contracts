@@ -31,7 +31,7 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
         .connect(account)
         .stake(
           { amount, token: wnative, nonce: 0 },
-          randomNumber(800, 1080),
+          randomNumber(180, 1080),
           [[wnative], [wnative, gainzAddress], []],
           1n,
           1n,

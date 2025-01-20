@@ -294,9 +294,10 @@ contract Router is
 		override
 		returns (address pairAddress, uint256 liquidity)
 	{
-		Governance governance = Governance(
-			payable(_getRouterStorage().governance)
-		);
+		address govAddr = _getRouterStorage().governance;
+		require(msg.sender == govAddr, "Not open for all");
+
+		Governance governance = Governance(payable(govAddr));
 		bool isTokenAInFunding = governance.pairListing(paymentA.token).owner !=
 			address(0);
 		bool isTokenBInFunding = governance.pairListing(paymentA.token).owner !=
@@ -370,6 +371,17 @@ contract Router is
 				revert(0, 0)
 			}
 		}
+	}
+
+	function register(address user, uint256 referrerId) external {
+		assert(
+			msg.sender ==
+				address(
+					Governance(payable(_getRouterStorage().governance))
+						.launchPair()
+				)
+		);
+		_createOrGetUserId(user, referrerId);
 	}
 
 	function swapExactTokensForTokens(

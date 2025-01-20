@@ -172,13 +172,20 @@ abstract contract SFT is ERC1155Upgradeable {
 		uint256[] memory ids,
 		uint256[] memory values
 	) internal virtual override {
-		super._update(from, to, ids, values);
-
 		for (uint256 i = 0; i < ids.length; i++) {
 			uint256 id = ids[i];
+
+			// When not minting
+			if (from != address(0))
+				require(
+					balanceOf(from, id) == values[i],
+					"SFT: Must transfer all"
+				);
 
 			_getSFTStorage().addressToNonces[from].remove(id);
 			_getSFTStorage().addressToNonces[to].add(id);
 		}
+
+		super._update(from, to, ids, values);
 	}
 }

@@ -91,11 +91,11 @@ library UserModuleLib {
 abstract contract UserModule {
 	// Event declarations
 	event UserRegistered(
-		uint256 userId,
-		address userAddress,
-		uint256 referrerId
+		uint256 indexed userId,
+		address indexed userAddress,
+		uint256 indexed referrerId
 	);
-	event ReferralAdded(uint256 referrerId, uint256 referralId);
+	event ReferralAdded(uint256 indexed referrerId, uint256 indexed referralId);
 
 	/// @custom:storage-location erc7201:userModule.storage
 	struct UserStorage {

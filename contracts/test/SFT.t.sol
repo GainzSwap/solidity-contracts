@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import "../abstracts/SFT.sol";
+import { SFT } from "../abstracts/SFT.sol";
 import { IERC1155Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 contract ConcreteSFT is SFT {
