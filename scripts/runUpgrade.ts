@@ -1,7 +1,7 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { Gainz, Router } from "../typechain-types";
-import { getGovernanceLibraries, getRouterLibraries } from "../utilities";
+import { getGovernanceLibraries, getRouterLibraries, sleep } from "../utilities";
 import { ZeroAddress } from "ethers";
 
 task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
@@ -103,6 +103,8 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   // Run any additional tasks, such as generating TypeScript ABIs
   await hre.deployments.run("generateTsAbis");
 
+  await sleep(2_000);
+
   console.log("Gainz ownership change");
   await newGainz.transferOwnership(newOwner);
   console.log("Router ownership change");
@@ -114,9 +116,29 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   await newRouter.setFeeToSetter(newFeeTo);
 
   console.log("Changing ProxyAdmin owner");
-  const proxyAdminGainz = await hre.upgrades.erc1967.getAdminAddress(gainzAddress);
-  const proxyAdminRouter = await hre.upgrades.erc1967.getAdminAddress(routerAddress);
-  console.log({ proxyAdminGainz, proxyAdminRouter });
+  const wNativeAddr = await router.getWrappedNativeToken();
 
-  await hre.upgrades.admin.transferProxyAdminOwnership(proxyAdminGainz, newOwner);
+  const proxyAdminGainz = await hre.upgrades.erc1967.getAdminAddress(gainzAddress);
+  const proxyAdminGToken = await hre.upgrades.erc1967.getAdminAddress(gTokenAddress);
+  const proxyAdminRouter = await hre.upgrades.erc1967.getAdminAddress(routerAddress);
+  const proxyAdminGov = await hre.upgrades.erc1967.getAdminAddress(govAddress);
+  const proxyAdminLaunchPair = await hre.upgrades.erc1967.getAdminAddress(launchPairAddress);
+  const proxyAdminWNtv = await hre.upgrades.erc1967.getAdminAddress(wNativeAddr);
+  const proxyAdminPairBeacon = await hre.upgrades.erc1967.getAdminAddress(pairBeaconAddress);
+
+  for (const [cName, proxyAdminAddr] of [
+    ["Gainz", proxyAdminGainz],
+    ["GToken", proxyAdminGToken],
+    ["WNTV", proxyAdminWNtv],
+    ["PairsBeacon", proxyAdminPairBeacon],
+    ["LaunchPair", proxyAdminLaunchPair],
+    ["Governance", proxyAdminGov],
+    ["Router", proxyAdminRouter],
+  ]) {
+    const proxyAdmin = await hre.ethers.getContractAt("ProxyAdmin", proxyAdminAddr);
+
+    console.log("Changing ", cName, " ProxyAdmin Ownership");
+    await proxyAdmin.transferOwnership(newOwner);
+    await sleep(1_000);
+  }
 });
