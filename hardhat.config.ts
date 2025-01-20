@@ -23,6 +23,7 @@ import "./scripts/createPair";
 import "./scripts/runUpgrade";
 import "./scripts/entityFund";
 import "./scripts/refund";
+import "./scripts/createHDWallet"
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey =
