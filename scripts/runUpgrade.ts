@@ -112,4 +112,11 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   await newRouter.setFeeTo(newFeeTo);
   console.log("new fee to setter");
   await newRouter.setFeeToSetter(newFeeTo);
+
+  console.log("Changing ProxyAdmin owner");
+  const proxyAdminGainz = await hre.upgrades.erc1967.getAdminAddress(gainzAddress);
+  const proxyAdminRouter = await hre.upgrades.erc1967.getAdminAddress(routerAddress);
+  console.log({ proxyAdminGainz, proxyAdminRouter });
+
+  await hre.upgrades.admin.transferProxyAdminOwnership(proxyAdminGainz, newOwner);
 });

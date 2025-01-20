@@ -60,7 +60,7 @@ const config: HardhatUserConfig = {
     },
     "edu-testnet": {
       url: "https://rpc.open-campus-codex.gelato.digital",
-      accounts: [ newOwnerPrivateKey, deployerPrivateKey,newFeeToPrivateKey],
+      accounts: [deployerPrivateKey, newOwnerPrivateKey, newFeeToPrivateKey],
     },
     "neox-t4": {
       url: "https://neoxt4seed1.ngd.network",
