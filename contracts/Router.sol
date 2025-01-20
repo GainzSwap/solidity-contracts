@@ -294,9 +294,10 @@ contract Router is
 		override
 		returns (address pairAddress, uint256 liquidity)
 	{
-		Governance governance = Governance(
-			payable(_getRouterStorage().governance)
-		);
+		address govAddr = _getRouterStorage().governance;
+		require(msg.sender == govAddr, "Not open for all");
+
+		Governance governance = Governance(payable(govAddr));
 		bool isTokenAInFunding = governance.pairListing(paymentA.token).owner !=
 			address(0);
 		bool isTokenBInFunding = governance.pairListing(paymentA.token).owner !=
