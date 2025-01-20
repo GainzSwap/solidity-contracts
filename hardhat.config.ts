@@ -74,7 +74,7 @@ const config: HardhatUserConfig = {
     },
     educhain: {
       url: "https://rpc.edu-chain.raas.gelato.cloud",
-      accounts: [deployerPrivateKey],
+      accounts: [deployerPrivateKey, newOwnerPrivateKey, newFeeToPrivateKey],
     },
   },
   // configuration for harhdat-verify plugin
