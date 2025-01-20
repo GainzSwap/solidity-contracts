@@ -23,7 +23,7 @@ import "./scripts/createPair";
 import "./scripts/runUpgrade";
 import "./scripts/entityFund";
 import "./scripts/refund";
-import "./scripts/createHDWallet"
+import "./scripts/createHDWallet";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey =
@@ -80,7 +80,7 @@ const config: HardhatUserConfig = {
   },
   // configuration for harhdat-verify plugin
   etherscan: {
-    apiKey: { opencampus: "NOT NEEDED", neox: "empty" },
+    apiKey: { opencampus: "NOT NEEDED", neox: "empty", educhain: "empty" },
     customChains: [
       {
         network: "opencampus",
@@ -88,6 +88,14 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://edu-chain-testnet.blockscout.com/api",
           browserURL: "https://edu-chain-testnet.blockscout.com",
+        },
+      },
+      {
+        network: "educhain",
+        chainId: 41923,
+        urls: {
+          apiURL: "https://educhain.blockscout.com/api",
+          browserURL: "https://educhain.blockscout.com",
         },
       },
       {
