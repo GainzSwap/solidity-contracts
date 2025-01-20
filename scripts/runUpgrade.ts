@@ -106,7 +106,7 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   console.log("LaunchPair upgraded successfully.");
 
   // Get contract factories for the new implementations
-  const pairFactory = () => hre.ethers.getContractFactory("Pair", { signer: deployerSigner });
+  const pairFactory = async () => hre.ethers.getContractFactory("Pair", { signer: deployerSigner });
   console.log("Force importing Pair beacon...");
   const pairBeacon = await hre.upgrades.forceImport(pairBeaconAddress, await pairFactory());
   // Upgrade the Beacon with the new implementation of Pair
@@ -135,36 +135,28 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   await newGainz.transferOwnership(newOwner);
   console.log("Router ownership change");
   await newRouter.transferOwnership(newOwner);
+  console.log("PairBeacon ownership change");
+  await pairBeacon.transferOwnership(newOwner);
+
+  console.log("Changing ProxyAdmin owner");
+  const wNativeAddr = await router.getWrappedNativeToken();
+
+  for (const [cName, proxyAddr] of [
+    ["Gainz", gainzAddress],
+    ["GToken", gTokenAddress],
+    ["WNTV", wNativeAddr],
+    ["LaunchPair", launchPairAddress],
+    ["Governance", govAddress],
+    ["Router", routerAddress],
+  ]) {
+    console.log("Changing ", cName, " ProxyAdmin Ownership");
+    await hre.upgrades.admin.transferProxyAdminOwnership(proxyAddr, newOwner, deployerSigner);
+
+    await sleep(1_000);
+  }
 
   console.log("new fee to");
   await newRouter.setFeeTo(newFeeTo);
   console.log("new fee to setter");
   await newRouter.setFeeToSetter(newFeeTo);
-
-  console.log("Changing ProxyAdmin owner");
-  const wNativeAddr = await router.getWrappedNativeToken();
-
-  const proxyAdminGainz = await hre.upgrades.erc1967.getAdminAddress(gainzAddress);
-  const proxyAdminGToken = await hre.upgrades.erc1967.getAdminAddress(gTokenAddress);
-  const proxyAdminRouter = await hre.upgrades.erc1967.getAdminAddress(routerAddress);
-  const proxyAdminGov = await hre.upgrades.erc1967.getAdminAddress(govAddress);
-  const proxyAdminLaunchPair = await hre.upgrades.erc1967.getAdminAddress(launchPairAddress);
-  const proxyAdminWNtv = await hre.upgrades.erc1967.getAdminAddress(wNativeAddr);
-  const proxyAdminPairBeacon = await hre.upgrades.erc1967.getAdminAddress(pairBeaconAddress);
-
-  for (const [cName, proxyAdminAddr] of [
-    ["Gainz", proxyAdminGainz],
-    ["GToken", proxyAdminGToken],
-    ["WNTV", proxyAdminWNtv],
-    ["PairsBeacon", proxyAdminPairBeacon],
-    ["LaunchPair", proxyAdminLaunchPair],
-    ["Governance", proxyAdminGov],
-    ["Router", proxyAdminRouter],
-  ]) {
-    const proxyAdmin = await hre.ethers.getContractAt("ProxyAdmin", proxyAdminAddr);
-
-    console.log("Changing ", cName, " ProxyAdmin Ownership");
-    await proxyAdmin.connect(deployerSigner).transferOwnership(newOwner);
-    await sleep(1_000);
-  }
 });
