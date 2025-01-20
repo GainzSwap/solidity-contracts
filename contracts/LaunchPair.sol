@@ -266,7 +266,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		);
 
 		uint256 weiAmount = msg.value;
-		payable(router.feeTo()).transfer(msg.value);
+		if (_campaignId == 1) payable(router.feeTo()).transfer(msg.value);
 
 		Campaign storage campaign = $.campaigns[_campaignId];
 		require(
@@ -292,7 +292,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 	) external payable campaignExists(_campaignId) {
 		MainStorage storage $ = _getMainStorage();
 		Campaign storage campaign = $.campaigns[_campaignId];
-		
+
 		require(campaign.deadline < block.timestamp, "Campaign not ended");
 
 		require(campaign.fundsRaised == msg.value, "Mismatch");
