@@ -6,6 +6,8 @@ import { ZeroAddress } from "ethers";
 
 task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   const { deployer, newOwner, newFeeTo } = await hre.getNamedAccounts();
+  const deployerSigner = await hre.ethers.getSigner(deployer);
+  console.log({ deployer, newOwner, newFeeTo });
 
   if (!newOwner || !newFeeTo) {
     throw new Error("Please set newOwner and newFeeTo named accounts");
@@ -32,10 +34,17 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
 
   // Gainz
   console.log("Upgrading Gainz");
-  await hre.upgrades.forceImport(gainzAddress, await hre.ethers.getContractFactory("Gainz"));
-  const newGainz = await hre.upgrades.upgradeProxy(gainzAddress, await hre.ethers.getContractFactory("Gainz"), {
-    redeployImplementation: "always",
-  });
+  await hre.upgrades.forceImport(
+    gainzAddress,
+    await hre.ethers.getContractFactory("Gainz", { signer: deployerSigner }),
+  );
+  const newGainz = await hre.upgrades.upgradeProxy(
+    gainzAddress,
+    await hre.ethers.getContractFactory("Gainz", { signer: deployerSigner }),
+    {
+      redeployImplementation: "always",
+    },
+  );
   console.log("Gainz upgraded successfully.");
 
   // Libraries
@@ -47,7 +56,7 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   console.log("Upgrading Router");
   const newRouter = await hre.upgrades.upgradeProxy(
     routerAddress,
-    await hre.ethers.getContractFactory("Router", { libraries: routerLibs }),
+    await hre.ethers.getContractFactory("Router", { libraries: routerLibs, signer: deployerSigner }),
     { redeployImplementation: "always", unsafeAllowLinkedLibraries: true },
   );
   console.log("Setting PriceOracle");
@@ -56,31 +65,48 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
 
   // Governance
   console.log("Upgrading Governance");
-  await hre.upgrades.forceImport(govAddress, await hre.ethers.getContractFactory("Governance", { libraries: govLibs }));
+  await hre.upgrades.forceImport(
+    govAddress,
+    await hre.ethers.getContractFactory("Governance", { libraries: govLibs, signer: deployerSigner }),
+  );
   await hre.upgrades.upgradeProxy(
     govAddress,
-    await hre.ethers.getContractFactory("Governance", { libraries: govLibs }),
+    await hre.ethers.getContractFactory("Governance", { libraries: govLibs, signer: deployerSigner }),
     { redeployImplementation: "always", unsafeAllowLinkedLibraries: true },
   );
   console.log("Governance upgraded successfully.");
 
   // GToken
   console.log("Upgrading GToken");
-  await hre.upgrades.forceImport(gTokenAddress, await hre.ethers.getContractFactory("GToken"));
-  await hre.upgrades.upgradeProxy(gTokenAddress, await hre.ethers.getContractFactory("GToken"), {
-    redeployImplementation: "always",
-  });
+  await hre.upgrades.forceImport(
+    gTokenAddress,
+    await hre.ethers.getContractFactory("GToken", { signer: deployerSigner }),
+  );
+  await hre.upgrades.upgradeProxy(
+    gTokenAddress,
+    await hre.ethers.getContractFactory("GToken", { signer: deployerSigner }),
+    {
+      redeployImplementation: "always",
+    },
+  );
   console.log("GToken upgraded successfully.");
 
   console.log("Upgrading LaunchPair");
-  await hre.upgrades.forceImport(launchPairAddress, await hre.ethers.getContractFactory("LaunchPair"));
-  await hre.upgrades.upgradeProxy(launchPairAddress, await hre.ethers.getContractFactory("LaunchPair"), {
-    redeployImplementation: "always",
-  });
+  await hre.upgrades.forceImport(
+    launchPairAddress,
+    await hre.ethers.getContractFactory("LaunchPair", { signer: deployerSigner }),
+  );
+  await hre.upgrades.upgradeProxy(
+    launchPairAddress,
+    await hre.ethers.getContractFactory("LaunchPair", { signer: deployerSigner }),
+    {
+      redeployImplementation: "always",
+    },
+  );
   console.log("LaunchPair upgraded successfully.");
 
   // Get contract factories for the new implementations
-  const pairFactory = () => hre.ethers.getContractFactory("Pair");
+  const pairFactory = () => hre.ethers.getContractFactory("Pair", { signer: deployerSigner });
   console.log("Force importing Pair beacon...");
   const pairBeacon = await hre.upgrades.forceImport(pairBeaconAddress, await pairFactory());
   // Upgrade the Beacon with the new implementation of Pair
@@ -138,7 +164,7 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
     const proxyAdmin = await hre.ethers.getContractAt("ProxyAdmin", proxyAdminAddr);
 
     console.log("Changing ", cName, " ProxyAdmin Ownership");
-    await proxyAdmin.transferOwnership(newOwner);
+    await proxyAdmin.connect(deployerSigner).transferOwnership(newOwner);
     await sleep(1_000);
   }
 });
