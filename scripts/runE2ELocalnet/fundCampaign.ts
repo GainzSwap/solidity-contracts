@@ -1,5 +1,5 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { Gainz, GToken, Router } from "../../typechain-types";
+import { Router } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { minutes } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
@@ -19,7 +19,7 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
   const campaignIds = await launchPair.getActiveCampaigns();
 
   for (const campaignId of campaignIds) {
-    const { goal, deadline } = await launchPair.getCampaignDetails(campaignId);
+    const { deadline } = await launchPair.getCampaignDetails(campaignId);
     if (deadline <= (await time.latest())) continue;
 
     for (const account of accounts) {
@@ -29,7 +29,8 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
           return BigInt(randBal) / 100_000n;
         });
 
-        const referrerId = Math.floor(Math.random() * +(await router.totalUsers()).toString());
+        const totalUsers = +(await router.totalUsers()).toString();
+        const referrerId = [0, 1, 2, 3, 4, 5][(totalUsers + 1) % 3];
         await launchPair.connect(account).contribute(campaignId, referrerId, { value: amount });
 
         console.log(`${account.address} funded campaign ${campaignId}`);
