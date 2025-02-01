@@ -40,6 +40,5 @@ task("runE2ELocalnet", "").setAction(async (_, hre) => {
       }),
     );
 
-    await sleep(randomNumber(800, 3_000));
   }
 });

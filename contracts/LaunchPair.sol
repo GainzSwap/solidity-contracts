@@ -250,6 +250,10 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		);
 	}
 
+	function forceUpgrade() external {
+		revert("Not usable");
+	}
+
 	/**
 	 * @dev Contribute to a crowdfunding campaign.
 	 * @param _campaignId The ID of the campaign to contribute to.
@@ -258,7 +262,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		uint256 _campaignId,
 		uint256 referrerId
 	) external payable campaignExists(_campaignId) isNotExpired(_campaignId) {
-		require(msg.value >= 1e18, "Minimum contribution is 1");
+		require(msg.value >= 0.001 ether, "Minimum contribution is 0.001 $EDU");
 		MainStorage storage $ = _getMainStorage();
 
 		Router router = Router(
@@ -266,7 +270,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		);
 
 		uint256 weiAmount = msg.value;
-		if (_campaignId == 1) payable(router.feeTo()).transfer(msg.value);
+		payable(router.feeTo()).transfer(msg.value);
 
 		Campaign storage campaign = $.campaigns[_campaignId];
 		require(

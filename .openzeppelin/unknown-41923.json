@@ -2817,6 +2817,609 @@
         "0xa3c9df1A172E5890d2D4b41a971710c91784C80b",
         "0xf611301FA2c5BDF876E1eE6A7fEFb4f67b36217E"
       ]
+    },
+    "76ff29fa215602fd95baa30858c14e6c314e7a72557c6ce1b88ad6eac8219745": {
+      "address": "0x44CA85619FFF69628c6C6EA551cc926ecB8E1804",
+      "layout": {
+        "solcVersion": "0.8.28",
+        "storage": [],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(GToken)6728": {
+            "label": "contract GToken",
+            "numberOfBytes": "20"
+          },
+          "t_enum(CampaignStatus)3892": {
+            "label": "enum LaunchPair.CampaignStatus",
+            "members": [
+              "Pending",
+              "Funding",
+              "Failed",
+              "Success"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_struct(UintSet)3394_storage)": {
+            "label": "mapping(address => struct EnumerableSet.UintSet)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(uint256 => mapping(address => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Campaign)3908_storage)": {
+            "label": "mapping(uint256 => struct LaunchPair.Campaign)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Campaign)3908_storage": {
+            "label": "struct LaunchPair.Campaign",
+            "members": [
+              {
+                "label": "creator",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "gtokenNonce",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "goal",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "deadline",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "fundsRaised",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "isWithdrawn",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(CampaignStatus)3892",
+                "offset": 1,
+                "slot": "5"
+              }
+            ],
+            "numberOfBytes": "192"
+          },
+          "t_struct(InitializableStorage)73_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(MainStorage)3934_storage": {
+            "label": "struct LaunchPair.MainStorage",
+            "members": [
+              {
+                "label": "campaigns",
+                "type": "t_mapping(t_uint256,t_struct(Campaign)3908_storage)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "contributions",
+                "type": "t_mapping(t_uint256,t_mapping(t_address,t_uint256))",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "userCampaigns",
+                "type": "t_mapping(t_address,t_struct(UintSet)3394_storage)",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "activeCampaigns",
+                "type": "t_struct(UintSet)3394_storage",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "campaignCount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "gToken",
+                "type": "t_contract(GToken)6728",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(OwnableStorage)13_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(Set)3196_storage": {
+            "label": "struct EnumerableSet.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_positions",
+                "type": "t_mapping(t_bytes32,t_uint256)",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(UintSet)3394_storage": {
+            "label": "struct EnumerableSet.UintSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)3196_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          }
+        },
+        "namespaces": {
+          "erc7201:gainz.LaunchPair.storage": [
+            {
+              "contract": "LaunchPair",
+              "label": "campaigns",
+              "type": "t_mapping(t_uint256,t_struct(Campaign)3908_storage)",
+              "src": "contracts/LaunchPair.sol:44",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "LaunchPair",
+              "label": "contributions",
+              "type": "t_mapping(t_uint256,t_mapping(t_address,t_uint256))",
+              "src": "contracts/LaunchPair.sol:46",
+              "offset": 0,
+              "slot": "1"
+            },
+            {
+              "contract": "LaunchPair",
+              "label": "userCampaigns",
+              "type": "t_mapping(t_address,t_struct(UintSet)3394_storage)",
+              "src": "contracts/LaunchPair.sol:48",
+              "offset": 0,
+              "slot": "2"
+            },
+            {
+              "contract": "LaunchPair",
+              "label": "activeCampaigns",
+              "type": "t_struct(UintSet)3394_storage",
+              "src": "contracts/LaunchPair.sol:50",
+              "offset": 0,
+              "slot": "3"
+            },
+            {
+              "contract": "LaunchPair",
+              "label": "campaignCount",
+              "type": "t_uint256",
+              "src": "contracts/LaunchPair.sol:52",
+              "offset": 0,
+              "slot": "5"
+            },
+            {
+              "contract": "LaunchPair",
+              "label": "gToken",
+              "type": "t_contract(GToken)6728",
+              "src": "contracts/LaunchPair.sol:53",
+              "offset": 0,
+              "slot": "6"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      },
+      "allAddresses": [
+        "0x44CA85619FFF69628c6C6EA551cc926ecB8E1804",
+        "0xBbdbE74bea3210e2aAD02b7506E2Cb5365E36D9E",
+        "0x80412c906792ED2838638Fead7a8E0D9769CaeEE"
+      ]
+    },
+    "bc11edb5ed304a6607bc28ac3be59ab44562a2b72cb341e1afe163190e82dfb1": {
+      "address": "0xBbdbE74bea3210e2aAD02b7506E2Cb5365E36D9E",
+      "layout": {
+        "solcVersion": "0.8.28",
+        "storage": [],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(GToken)6731": {
+            "label": "contract GToken",
+            "numberOfBytes": "20"
+          },
+          "t_enum(CampaignStatus)3892": {
+            "label": "enum LaunchPair.CampaignStatus",
+            "members": [
+              "Pending",
+              "Funding",
+              "Failed",
+              "Success"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_struct(UintSet)3394_storage)": {
+            "label": "mapping(address => struct EnumerableSet.UintSet)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(uint256 => mapping(address => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Campaign)3908_storage)": {
+            "label": "mapping(uint256 => struct LaunchPair.Campaign)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Campaign)3908_storage": {
+            "label": "struct LaunchPair.Campaign",
+            "members": [
+              {
+                "label": "creator",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "gtokenNonce",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "goal",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "deadline",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "fundsRaised",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "isWithdrawn",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(CampaignStatus)3892",
+                "offset": 1,
+                "slot": "5"
+              }
+            ],
+            "numberOfBytes": "192"
+          },
+          "t_struct(InitializableStorage)73_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(MainStorage)3934_storage": {
+            "label": "struct LaunchPair.MainStorage",
+            "members": [
+              {
+                "label": "campaigns",
+                "type": "t_mapping(t_uint256,t_struct(Campaign)3908_storage)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "contributions",
+                "type": "t_mapping(t_uint256,t_mapping(t_address,t_uint256))",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "userCampaigns",
+                "type": "t_mapping(t_address,t_struct(UintSet)3394_storage)",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "activeCampaigns",
+                "type": "t_struct(UintSet)3394_storage",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "campaignCount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "gToken",
+                "type": "t_contract(GToken)6731",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(OwnableStorage)13_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(Set)3196_storage": {
+            "label": "struct EnumerableSet.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_positions",
+                "type": "t_mapping(t_bytes32,t_uint256)",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(UintSet)3394_storage": {
+            "label": "struct EnumerableSet.UintSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)3196_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          }
+        },
+        "namespaces": {
+          "erc7201:gainz.LaunchPair.storage": [
+            {
+              "contract": "LaunchPair",
+              "label": "campaigns",
+              "type": "t_mapping(t_uint256,t_struct(Campaign)3908_storage)",
+              "src": "contracts/LaunchPair.sol:44",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "LaunchPair",
+              "label": "contributions",
+              "type": "t_mapping(t_uint256,t_mapping(t_address,t_uint256))",
+              "src": "contracts/LaunchPair.sol:46",
+              "offset": 0,
+              "slot": "1"
+            },
+            {
+              "contract": "LaunchPair",
+              "label": "userCampaigns",
+              "type": "t_mapping(t_address,t_struct(UintSet)3394_storage)",
+              "src": "contracts/LaunchPair.sol:48",
+              "offset": 0,
+              "slot": "2"
+            },
+            {
+              "contract": "LaunchPair",
+              "label": "activeCampaigns",
+              "type": "t_struct(UintSet)3394_storage",
+              "src": "contracts/LaunchPair.sol:50",
+              "offset": 0,
+              "slot": "3"
+            },
+            {
+              "contract": "LaunchPair",
+              "label": "campaignCount",
+              "type": "t_uint256",
+              "src": "contracts/LaunchPair.sol:52",
+              "offset": 0,
+              "slot": "5"
+            },
+            {
+              "contract": "LaunchPair",
+              "label": "gToken",
+              "type": "t_contract(GToken)6731",
+              "src": "contracts/LaunchPair.sol:53",
+              "offset": 0,
+              "slot": "6"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      },
+      "allAddresses": [
+        "0xBbdbE74bea3210e2aAD02b7506E2Cb5365E36D9E",
+        "0x59cA6C35c473bA2BeF5405Ea3C766486193a8172"
+      ]
     }
   }
 }
