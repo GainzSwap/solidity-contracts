@@ -187,7 +187,7 @@ library RouterLib {
 					"Router: INVALID_AMOUNT_IN_VALUES"
 				);
 				require(path[0] == wNtvAddr, "Router: INVALID_PATH");
-				WNTV(wNtvAddr).receiveFor{ value: msg.value }(pair);
+				WNTV(payable(wNtvAddr)).receiveFor{ value: msg.value }(pair);
 			} else {
 				TransferHelper.safeTransferFrom(
 					path[0],
