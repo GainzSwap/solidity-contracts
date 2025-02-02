@@ -250,10 +250,6 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		);
 	}
 
-	function forceUpgrade() external {
-		revert("Not usable");
-	}
-
 	/**
 	 * @dev Contribute to a crowdfunding campaign.
 	 * @param _campaignId The ID of the campaign to contribute to.
