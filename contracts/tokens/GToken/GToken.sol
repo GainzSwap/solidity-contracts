@@ -68,13 +68,6 @@ contract GToken is SFT {
 	) external canUpdate returns (uint256) {
 		uint256 currentEpoch = _getGTokenStorage().epochs.currentEpoch();
 
-		if (currentEpoch <= 180) {
-			require(
-				epochsLocked >= 180,
-				"GToken: INVALID_GENESIS_PERIOD_EPOCHS_LOCK"
-			);
-		}
-
 		// Create GToken attributes and compute the stake weight
 		GTokenLib.Attributes memory attributes = GTokenLib
 			.Attributes({
