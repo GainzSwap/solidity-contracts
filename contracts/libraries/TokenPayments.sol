@@ -63,24 +63,24 @@ library TokenPayments {
 
 	function sendToken(TokenPayment memory payment, address to) internal {
 		if (payment.nonce == 0) {
-			uint256 beforeNativeBal = address(this).balance;
+			// uint256 beforeNativeBal = address(this).balance;
 
-			// Try to withdraw ETH assuming payment.token is WNTV
-			(bool shouldMoveEthBalance, ) = payment.token.call(
-				abi.encodeWithSignature("withdraw(uint256)", payment.amount)
-			);
+			// // Try to withdraw ETH assuming payment.token is WNTV
+			// (bool shouldMoveEthBalance, ) = payment.token.call(
+			// 	abi.encodeWithSignature("withdraw(uint256)", payment.amount)
+			// );
 
-			// Checks to ensure balance movements
-			if (shouldMoveEthBalance) {
-				require(
-					(beforeNativeBal + payment.amount) == address(this).balance,
-					"Failed to withdraw WNTV"
-				);
+			// // Checks to ensure balance movements
+			// if (shouldMoveEthBalance) {
+			// 	require(
+			// 		(beforeNativeBal + payment.amount) == address(this).balance,
+			// 		"Failed to withdraw WNTV"
+			// 	);
 
-				payable(to).transfer(payment.amount);
-			} else {
-				IERC20(payment.token).transfer(to, payment.amount);
-			}
+			// 	payable(to).transfer(payment.amount);
+			// } else {
+			IERC20(payment.token).transfer(to, payment.amount);
+			// }
 		} else {
 			// SFT payment
 			SFT(payment.token).safeTransferFrom(

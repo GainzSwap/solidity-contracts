@@ -4,19 +4,19 @@ pragma solidity ^0.8.28;
 import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-interface IWEDU {
-	function deposit() external payable;
-
-	function withdraw(uint256 wad) external;
-}
-
 /// @title WNTV (Wrapped Native Token)
 /// @notice This contract wraps native tokens into ERC20-compliant WNTV tokens.
 contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
+	struct UserWithdrawal {
+		uint256 amount;
+		uint256 matureTimestamp;
+	}
+
 	/// @custom:storage-location erc7201:gainz.tokens.WNTV.storage
 	struct WNTVStore {
-		address payable wedu;
-		mapping(address => bool) knownWedu;
+		address payable yuzuAggregator;
+		mapping(address => UserWithdrawal) withdrawals;
+		uint256 pendingWithdrawals;
 	}
 
 	// keccak256(abi.encode(uint256(keccak256("gainz.tokens.WNTV.storage")) - 1)) & ~bytes32(uint256(0xff))
@@ -40,9 +40,12 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 		_transferOwnership(msg.sender);
 	}
 
-	function setWEDU(address _wedu) external onlyOwner {
-		_getWNTVStorage().wedu = payable(_wedu);
-		_getWNTVStorage().knownWedu[_wedu] = true;
+	function setYuzuAggregator(address _yuzuAggregator) external onlyOwner {
+		_getWNTVStorage().yuzuAggregator = payable(_yuzuAggregator);
+	}
+
+	function settleWithdrawals() external payable {
+		_getWNTVStorage().pendingWithdrawals -= msg.value;
 	}
 
 	/// @notice Unwraps WNTV tokens back into native tokens.
@@ -52,8 +55,39 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 		require(balanceOf(msg.sender) >= amount, "WNTV: Insufficient balance");
 		_burn(msg.sender, amount);
 
-		IWEDU(_getWNTVStorage().wedu).withdraw(amount);
-		payable(msg.sender).transfer(amount);
+		UserWithdrawal storage withdrawal = _getWNTVStorage().withdrawals[
+			msg.sender
+		];
+		withdrawal.matureTimestamp =
+			block.timestamp -
+			(block.timestamp % 24 hours) +
+			48 hours;
+		withdrawal.amount = amount;
+
+		_getWNTVStorage().pendingWithdrawals += amount;
+
+		assert(
+			this.pendingWithdrawals() <=
+				_getWNTVStorage().yuzuAggregator.balance
+		);
+	}
+
+	function completeWithdrawal() external {
+		UserWithdrawal storage withdrawal = _getWNTVStorage().withdrawals[
+			msg.sender
+		];
+
+		uint256 amount = withdrawal.amount;
+		uint256 matureTimestamp = withdrawal.matureTimestamp;
+
+		require(matureTimestamp <= block.timestamp, "Withdrawal not matured");
+
+		// Clear storage to free up gas before making an external call
+		delete _getWNTVStorage().withdrawals[msg.sender];
+
+		// Use call to send EDU, handling failure gracefully
+		(bool success, ) = payable(msg.sender).call{ value: amount }("");
+		require(success, "EDU transfer failed");
 	}
 
 	/// @notice Allows an approved spender to use WNTV tokens on behalf of the sender.
@@ -76,16 +110,30 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 	/// @dev early returns if @param depositor is/was a WEDU address or is this contract
 	/// @param depositor the address to stake for
 	function _stakeEDU(address depositor) internal {
-		IWEDU(_getWNTVStorage().wedu).deposit{ value: address(this).balance }();
+		address yuzuAggregator_ = _getWNTVStorage().yuzuAggregator;
+		require(yuzuAggregator_ != address(0), "yuzuAggregator not set");
 
-		if (depositor == address(this)) return;
+		(bool s, ) = yuzuAggregator_.call{ value: msg.value }("");
+		require(s, "Failed to stake for Yuzu");
 
 		_mint(depositor, msg.value);
 	}
 
-	function wedu() external view returns (address) {
-		return _getWNTVStorage().wedu;
+	function yuzuAggregator() external view returns (address) {
+		return _getWNTVStorage().yuzuAggregator;
 	}
 
-	receive() external payable {}
+	function pendingWithdrawals() external view returns (uint256) {
+		return _getWNTVStorage().pendingWithdrawals;
+	}
+
+	function userPendingWithdrawals(
+		address user
+	) external view returns (UserWithdrawal memory) {
+		return _getWNTVStorage().withdrawals[user];
+	}
+
+	receive() external payable {
+		_stakeEDU(msg.sender);
+	}
 }

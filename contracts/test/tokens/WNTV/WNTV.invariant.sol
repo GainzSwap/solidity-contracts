@@ -11,7 +11,6 @@ import { StdUtils } from "forge-std/StdUtils.sol";
 import { console } from "forge-std/console.sol";
 import { AddressSet, LibAddressSet } from "./helpers/AddressSet.sol";
 import { WNTV } from "../../../tokens/WNTV.sol";
-import { WEDU } from "../../../oc/WEDU.sol";
 
 uint256 constant ETH_SUPPLY = 1_000_000_000 ether;
 
@@ -19,12 +18,11 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 	using LibAddressSet for AddressSet;
 
 	WNTV public weth;
+	address public yuzuAggregator = address(15);
 
 	uint256 public ghost_depositSum;
 	uint256 public ghost_withdrawSum;
-	uint256 public ghost_forcePushSum;
 
-	uint256 public ghost_zeroWithdrawals;
 	uint256 public ghost_zeroTransfers;
 	uint256 public ghost_zeroTransferFroms;
 
@@ -34,9 +32,11 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 	address internal currentActor;
 
 	modifier createActor() {
-		vm.assume(msg.sender != weth.wedu());
-
 		currentActor = msg.sender;
+		vm.assume(
+			currentActor != yuzuAggregator && currentActor != address(weth)
+		);
+
 		_actors.add(msg.sender);
 		_;
 	}
@@ -55,6 +55,11 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 
 	constructor(WNTV _weth) {
 		weth = _weth;
+
+		weth.initialize();
+		weth.setup();
+		weth.setYuzuAggregator(yuzuAggregator);
+
 		deal(address(this), ETH_SUPPLY);
 	}
 
@@ -65,8 +70,34 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 		vm.prank(currentActor);
 		(bool s, ) = payable(address(weth)).call{ value: amount }("");
 		require(s, "Deposit not succeded");
+		vm.stopPrank();
 
-		if (currentActor != address(weth)) ghost_depositSum += amount;
+		ghost_depositSum += amount;
+	}
+
+	function completeWithdrawal(
+		uint256 actorSeed
+	) external useActor(actorSeed) countCall("completeWithdrawal") {
+		{
+			// Ensure sufficient funds
+			uint256 pendingWithdrawals = weth.pendingWithdrawals();
+
+			if (pendingWithdrawals > 0) {
+				vm.prank(yuzuAggregator);
+				weth.settleWithdrawals{ value: pendingWithdrawals }();
+				vm.stopPrank();
+			}
+		}
+
+		WNTV.UserWithdrawal memory withdrawal = weth.userPendingWithdrawals(
+			currentActor
+		);
+
+		vm.prank(currentActor);
+		weth.completeWithdrawal();
+
+		vm.prank(currentActor);
+		_pay(address(this), withdrawal.amount);
 	}
 
 	function withdraw(
@@ -74,14 +105,20 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 		uint256 amount
 	) public useActor(actorSeed) countCall("withdraw") {
 		amount = bound(amount, 0, weth.balanceOf(currentActor));
-		if (amount == 0) ghost_zeroWithdrawals++;
 
 		vm.startPrank(currentActor);
 		weth.withdraw(amount);
-		_pay(address(this), amount);
 		vm.stopPrank();
 
 		ghost_withdrawSum += amount;
+
+		WNTV.UserWithdrawal memory withdrawal = weth.userPendingWithdrawals(
+			currentActor
+		);
+		// Properly warp time so balnces are not affected
+		if (block.timestamp < withdrawal.matureTimestamp) {
+			vm.warp(withdrawal.matureTimestamp);
+		}
 	}
 
 	function approve(
@@ -93,6 +130,7 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 
 		vm.prank(currentActor);
 		weth.approve(spender, amount);
+		vm.stopPrank();
 	}
 
 	function transfer(
@@ -107,6 +145,7 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 
 		vm.prank(currentActor);
 		weth.transfer(to, amount);
+		vm.stopPrank();
 	}
 
 	function transferFrom(
@@ -131,6 +170,7 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 
 		vm.prank(currentActor);
 		weth.transferFrom(from, to, amount);
+		vm.stopPrank();
 	}
 
 	function sendFallback(
@@ -141,6 +181,7 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 
 		vm.prank(currentActor);
 		_pay(address(weth), amount);
+		vm.stopPrank();
 
 		ghost_depositSum += amount;
 	}
@@ -172,7 +213,6 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 		console.log("forcePush", calls["forcePush"]);
 		console.log("-------------------");
 
-		console.log("Zero withdrawals:", ghost_zeroWithdrawals);
 		console.log("Zero transferFroms:", ghost_zeroTransferFroms);
 		console.log("Zero transfers:", ghost_zeroTransfers);
 	}
@@ -188,25 +228,19 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 contract WNTVInvariants is Test {
 	WNTV public weth;
 	Handler public handler;
-	WEDU wedu;
 
 	function setUp() public {
-		wedu = new WEDU();
-
 		weth = new WNTV();
-		weth.initialize();
-		weth.setup();
-		weth.setWEDU(address(wedu));
-
 		handler = new Handler(weth);
 
-		bytes4[] memory selectors = new bytes4[](6);
+		bytes4[] memory selectors = new bytes4[](7);
 		selectors[0] = Handler.deposit.selector;
-		selectors[1] = Handler.withdraw.selector;
-		selectors[2] = Handler.sendFallback.selector;
-		selectors[3] = Handler.approve.selector;
-		selectors[4] = Handler.transfer.selector;
-		selectors[5] = Handler.transferFrom.selector;
+		selectors[1] = Handler.completeWithdrawal.selector;
+		selectors[2] = Handler.withdraw.selector;
+		selectors[3] = Handler.sendFallback.selector;
+		selectors[4] = Handler.approve.selector;
+		selectors[5] = Handler.transfer.selector;
+		selectors[6] = Handler.transferFrom.selector;
 
 		targetSelector(
 			FuzzSelector({ addr: address(handler), selectors: selectors })
@@ -224,19 +258,23 @@ contract WNTVInvariants is Test {
 			ETH_SUPPLY,
 			address(handler).balance +
 				address(weth).balance +
-				weth.totalSupply()
+				handler.yuzuAggregator().balance
 		);
-		assertEq(wedu.balanceOf(address(weth)), weth.totalSupply());
 	}
 
 	// The WETH contract's Ether balance should always be
 	// at least as much as the sum of individual deposits
 	function invariant_solvencyDeposits() public view {
 		assertEq(
-			wedu.balanceOf(address(weth)) + address(weth).balance,
-			handler.ghost_depositSum() +
-				handler.ghost_forcePushSum() -
-				handler.ghost_withdrawSum()
+			weth.totalSupply(),
+			handler.ghost_depositSum() - handler.ghost_withdrawSum()
+		);
+	}
+
+	function invariant_solvencyPendingWithdrawals() public view {
+		assertGe(
+			address(weth).balance + weth.yuzuAggregator().balance,
+			weth.pendingWithdrawals()
 		);
 	}
 
@@ -244,10 +282,7 @@ contract WNTVInvariants is Test {
 	// at least as much as the sum of individual balances
 	function invariant_solvencyBalances() public {
 		uint256 sumOfBalances = handler.reduceActors(0, this.accumulateBalance);
-		assertEq(
-			wedu.balanceOf(address(weth)) - handler.ghost_forcePushSum(),
-			sumOfBalances
-		);
+		assertEq(weth.totalSupply(), sumOfBalances);
 	}
 
 	function accumulateBalance(

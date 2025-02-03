@@ -203,11 +203,11 @@ library RouterLib {
 		// Swap and prepare to unWrap Native if needed
 		bool autoUnwrap = to != governance && path[path.length - 1] == wNtvAddr;
 		_swap(amounts, path, autoUnwrap ? address(this) : to, pairsBeacon);
-		if (autoUnwrap)
-			path[path.length - 1].sendFungibleToken(
-				amounts[path.length - 1][0],
-				to
-			);
+		// if (autoUnwrap)
+		// 	path[path.length - 1].sendFungibleToken(
+		// 		amounts[path.length - 1][0],
+		// 		to
+		// 	);
 	}
 }
 
