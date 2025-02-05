@@ -116,8 +116,8 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 			currentActor
 		);
 		// Properly warp time so balnces are not affected
-		if (block.timestamp < withdrawal.matureTimestamp) {
-			vm.warp(withdrawal.matureTimestamp);
+		if (block.timestamp < withdrawal.readyTimestamp) {
+			vm.warp(withdrawal.readyTimestamp);
 		}
 	}
 

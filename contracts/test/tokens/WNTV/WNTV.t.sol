@@ -44,12 +44,12 @@ contract WNTVTest is Test {
 		);
 		assertEq(withdrawal.amount, amount, "Withdrawal amount not match");
 		assertGt(
-			withdrawal.matureTimestamp,
+			withdrawal.readyTimestamp,
 			block.timestamp,
 			"Withdrawal timestamp not match"
 		);
 
-		vm.warp(withdrawal.matureTimestamp);
+		vm.warp(withdrawal.readyTimestamp);
 		wntv.settleWithdrawals{ value: wntv.pendingWithdrawals() }();
 
 		vm.prank(owner);
