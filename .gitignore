@@ -33,4 +33,4 @@ temp
 out
 cache_forge
 
-scripts/runE2ELocalnet/wallets.json
+scripts/e2e/wallets.json

@@ -16,7 +16,7 @@ import "./scripts/createInitialPairs";
 import "./scripts/moveTime";
 import "./scripts/updateStartBlock";
 import "./scripts/upgradePairs";
-import "./scripts/runE2ELocalnet";
+import "./scripts/e2e";
 import "./scripts/deployNewViews";
 import "./scripts/deployERC20";
 import "./scripts/createPair";

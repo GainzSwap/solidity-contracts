@@ -6,9 +6,11 @@ import { randomNumber, sleep } from "../../utilities";
 import axios from "axios";
 import fundCampaign from "./fundCampaign";
 import claimRewards from "./claimRewards";
+import delegate from "./delegate";
+import unDelegate from "./unDelegate";
 
-task("runE2ELocalnet", "").setAction(async (_, hre) => {
-  const actions = [fundCampaign];
+task("e2e", "").setAction(async (_, hre) => {
+  const actions = [fundCampaign, delegate, unDelegate];
   const accounts = await hre.ethers.getSigners();
 
   while (true) {
@@ -39,6 +41,5 @@ task("runE2ELocalnet", "").setAction(async (_, hre) => {
         );
       }),
     );
-
   }
 });
