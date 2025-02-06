@@ -33,6 +33,11 @@ const deployRouterContract: DeployFunction = async function (hre: HardhatRuntime
   const views = await Views.deploy(routerAddress, await router.getPairsBeacon());
   await views.waitForDeployment();
 
+  const wntv = await ethers.getContractAt("WNTV", await router.getWrappedNativeToken());
+
+  await wntv.setup();
+  await wntv.setYuzuAggregator(deployer);
+
   const artifactsToSave = [
     ["Gainz", gainzAddress],
     ["Router", routerAddress],

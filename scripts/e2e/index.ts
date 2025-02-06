@@ -8,9 +8,12 @@ import fundCampaign from "./fundCampaign";
 import claimRewards from "./claimRewards";
 import delegate from "./delegate";
 import unDelegate from "./unDelegate";
+import transferWNTV from "./transferWNTV";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { minutes } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 
 task("e2e", "").setAction(async (_, hre) => {
-  const actions = [fundCampaign, delegate, unDelegate];
+  const actions = [transferWNTV, delegate, unDelegate, fundCampaign];
   const accounts = await hre.ethers.getSigners();
 
   while (true) {
@@ -34,11 +37,7 @@ task("e2e", "").setAction(async (_, hre) => {
           console.log(error);
         }
 
-        await Promise.allSettled(
-          selectedAccounts.map(account =>
-            axios.get("http://localhost:3000/api/user/stats/" + account.address + "?chainId=31337"),
-          ),
-        );
+        await time.increase(minutes(randomNumber(5, 50)));
       }),
     );
   }
