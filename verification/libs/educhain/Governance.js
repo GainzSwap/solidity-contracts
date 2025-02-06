@@ -1,6 +1,6 @@
 module.exports = {
-  "DeployLaunchPair": "0xAAC996021603cf6a64CB0bb4e3Be949FDAb74642",
-  "GovernanceLib": "0x34C8b0F352B842FF6Ee7A8D3005073DdE400F801",
-  "DeployGToken": "0x19f0ABEda05b261D1453793f54C064153ed739c8",
-  "OracleLibrary": "0x82103FfF26C1C2EEE07dC620E730d316Be54deF4"
+  "DeployLaunchPair": "0x2eb3BeCC44A82DCca41Ca541E2385dbD1f7273Dd",
+  "GovernanceLib": "0x10d8bd2584F2fCcb2cab2B8EeaB64427b1f2fCfC",
+  "DeployGToken": "0x9d4fEA798E34ccB1b8Dc28c14eDd6677Ad88bCB7",
+  "OracleLibrary": "0xe8fbe83Eff958671c2aD8b7Df46C412AB33b0412"
 };
