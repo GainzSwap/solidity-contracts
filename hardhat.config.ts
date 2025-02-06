@@ -24,7 +24,6 @@ import "./scripts/runUpgrade";
 import "./scripts/entityFund";
 import "./scripts/refund";
 import "./scripts/createHDWallet";
-import "./scripts/setYuzuAggregator";
 import "./scripts/settleWithdrawals";
 
 // If not set, it uses the hardhat account 0 private key.

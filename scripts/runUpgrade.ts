@@ -50,6 +50,8 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
       redeployImplementation: "always",
     },
   );
+  await newWntv.setup();
+  await newWntv.setYuzuAggregator(deployer);
   console.log("WNTV upgraded successfully.");
 
   // Libraries
