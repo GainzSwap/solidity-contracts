@@ -40,7 +40,14 @@ library TokenPayments {
 			WNTV(payable(wNTV)).receiveFor{ value: payment.amount }(to);
 		} else if (payment.nonce == 0) {
 			// ERC20 payment
-			IERC20(payment.token).transferFrom(from, to, payment.amount);
+			// bytes4(keccak256(bytes('transferFrom(address,address,uint256)')));
+			(bool success, bytes memory data) = payment.token.call(
+				abi.encodeWithSelector(0x23b872dd, from, to, payment.amount)
+			);
+			require(
+				success && (data.length == 0 || abi.decode(data, (bool))),
+				"TokenPayments: transferFrom failed"
+			);
 		} else {
 			// SFT payment
 			SFT(payment.token).safeTransferFrom(
@@ -58,29 +65,19 @@ library TokenPayments {
 		uint256 amount,
 		address to
 	) internal {
-		sendToken(TokenPayment({ token: token, amount: amount, nonce: 0 }), to);
+		// bytes4(keccak256(bytes('transfer(address,uint256)')));
+		(bool success, bytes memory data) = token.call(
+			abi.encodeWithSelector(0xa9059cbb, to, amount)
+		);
+		require(
+			success && (data.length == 0 || abi.decode(data, (bool))),
+			"TokenPayments: sendFungibleToken failed"
+		);
 	}
 
 	function sendToken(TokenPayment memory payment, address to) internal {
 		if (payment.nonce == 0) {
-			// uint256 beforeNativeBal = address(this).balance;
-
-			// // Try to withdraw ETH assuming payment.token is WNTV
-			// (bool shouldMoveEthBalance, ) = payment.token.call(
-			// 	abi.encodeWithSignature("withdraw(uint256)", payment.amount)
-			// );
-
-			// // Checks to ensure balance movements
-			// if (shouldMoveEthBalance) {
-			// 	require(
-			// 		(beforeNativeBal + payment.amount) == address(this).balance,
-			// 		"Failed to withdraw WNTV"
-			// 	);
-
-			// 	payable(to).transfer(payment.amount);
-			// } else {
-			IERC20(payment.token).transfer(to, payment.amount);
-			// }
+			sendFungibleToken(payment.token, payment.amount, to);
 		} else {
 			// SFT payment
 			SFT(payment.token).safeTransferFrom(
