@@ -114,10 +114,10 @@ library GainzEmission {
 library Entities {
 	uint32 public constant UNITY = 100_00;
 
-	uint32 public constant TEAM = 15_00;
-	uint32 public constant STAKING = 50_00;
-	uint32 public constant LIQ_INCENTIVE = 25_00;
-	uint32 public constant GROWTH = 10_00;
+	uint32 public constant TEAM = 10_00;
+	uint32 public constant STAKING = 20_00;
+	uint32 public constant LIQ_INCENTIVE = 15_00;
+	uint32 public constant GROWTH = 55_00;
 
 	struct Value {
 		uint256 team;
