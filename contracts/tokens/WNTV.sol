@@ -20,7 +20,7 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 		uint256 pendingWithdrawals;
 	}
 
-	/// @dev Storage slot for contract state using EIP-7201 pattern.
+	/// @dev keccak256(abi.encode(uint256(keccak256("gainz.tokens.WNTV.storage")) - 1)) & ~bytes32(uint256(0xff));
 	bytes32 private constant WNTV_STORAGE_SLOT =
 		0x9c939a4b05ceda8b86db186f0245ad77465dc7a372c22a1f429a973574185700;
 
@@ -48,15 +48,20 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 
 	/// @notice Initializes the contract and sets token metadata.
 	function initialize() public initializer {
-		__ERC20_init("Wrapped Native Token", "WNTV");
+		__ERC20_init("Delegated EDU", "dEDU");
 	}
 
 	/// @notice Sets the contract owner after deployment.
 	/// @dev this is neccessary as the contract was not ownable when initially deployed
 	/// 	  This should be removed in the next upgrade
-	function setup() external {
-		require(owner() == address(0), "Already set");
-		_transferOwnership(msg.sender);
+	function setup() external onlyOwner {
+		ERC20Upgradeable.ERC20Storage storage erc20Storage;
+		assembly {
+			erc20Storage.slot := 0x52c63247e1f47db19d5ce0460030c497f067ca4cebf71ba98eeadabe20bace00
+		}
+
+		erc20Storage._name = "Delegated EDU";
+		erc20Storage._symbol = "dEDU";
 	}
 
 	/// @notice Sets the Yuzu aggregator address.
@@ -87,11 +92,7 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 		withdrawal.amount += amount;
 
 		_getWNTVStorage().pendingWithdrawals += amount;
-		emit WithdrawalRequested(
-			msg.sender,
-			amount,
-			withdrawal.readyTimestamp
-		);
+		emit WithdrawalRequested(msg.sender, amount, withdrawal.readyTimestamp);
 	}
 
 	/// @notice Completes a matured withdrawal.
