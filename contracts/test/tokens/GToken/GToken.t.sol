@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import { GToken, Epochs, LiquidityInfo, GTokenBalance, GTokenLib } from "../tokens/GToken/GToken.sol";
+import { GToken, Epochs, LiquidityInfo, GTokenBalance, GTokenLib } from "../../../tokens/GToken/GToken.sol";
 
 contract GTokenTest is Test {
 	using GTokenLib for GTokenLib.Attributes;

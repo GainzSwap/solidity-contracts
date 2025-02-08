@@ -4,8 +4,8 @@ pragma solidity ^0.8.28;
 import { Test, console } from "forge-std/Test.sol";
 import { CommonBase } from "forge-std/Base.sol";
 import { StdUtils } from "forge-std/StdUtils.sol";
-import { Gainz } from "../tokens/Gainz/Gainz.sol";
-import { Governance, Epochs } from "../Governance.sol";
+import { Gainz } from "../../../tokens/Gainz/Gainz.sol";
+import { Governance, Epochs } from "../../../Governance.sol";
 
 contract Handler is CommonBase, StdUtils {
 	Gainz gainz;

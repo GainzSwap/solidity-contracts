@@ -5,7 +5,7 @@ import { Test, console } from "forge-std/Test.sol";
 import { CommonBase } from "forge-std/Base.sol";
 import { StdUtils } from "forge-std/StdUtils.sol";
 import { StdAssertions } from "forge-std/StdAssertions.sol";
-import { GToken, GTokenLib, LiquidityInfo, Epochs, GTokenBalance } from "../tokens/GToken/GToken.sol";
+import { GToken, GTokenLib, LiquidityInfo, Epochs, GTokenBalance } from "../../../tokens/GToken/GToken.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract GTokenHandler is CommonBase, StdUtils, StdAssertions {

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { Test, console } from "forge-std/Test.sol";
-import { Entities, GainzEmission } from "../tokens/Gainz/GainzEmission.sol";
+import { Entities, GainzEmission } from "../../../tokens/Gainz/GainzEmission.sol";
 
 contract GainzEmissionTest is Test {
 	using Entities for Entities.Value;
