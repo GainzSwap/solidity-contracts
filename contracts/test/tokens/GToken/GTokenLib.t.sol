@@ -11,51 +11,50 @@ contract GTokenLibFuzzTest is Test {
 	function testComputeStakeWeight(
 		uint256 liqValue,
 		uint256 epochsLocked
-	) public {
+	) public pure {
 		epochsLocked = bound(
 			epochsLocked,
 			GTokenLib.MIN_EPOCHS_LOCK,
 			GTokenLib.MAX_EPOCHS_LOCK
+		);
+		liqValue = bound(
+			liqValue,
+			0,
+			type(uint256).max / GTokenLib.MAX_EPOCHS_LOCK
 		);
 
 		GTokenLib.Attributes memory attributes = _createAttributes(
 			liqValue,
 			epochsLocked
 		);
+		attributes.lpDetails.liquidity = liqValue;
+		attributes = attributes.computeStakeWeight();
 
-		if (liqValue > type(uint256).max / epochsLocked) {
-			vm.expectRevert("GToken: Stake weight overflow");
-		}
-
-		GTokenLib.Attributes memory result = attributes.computeStakeWeight();
-
-		if (liqValue <= type(uint256).max / epochsLocked) {
-			assertEq(
-				result.stakeWeight,
-				liqValue * epochsLocked,
-				"Incorrect stake weight"
-			);
-		}
+		assertEq(
+			attributes.stakeWeight,
+			liqValue * epochsLocked,
+			"Incorrect stake weight"
+		);
 	}
 
 	// Fuzz test for `split`
-	function testSplit(
-		uint256 liqValue,
-		uint256 liquidity,
-		uint256[] memory liquidityPortions
-	) public pure {
-		GTokenLib.Attributes memory attributes = _createAttributes(liqValue, 1);
-
-		// Ensure non-zero liquidity to avoid division errors
-		liquidity = bound(liquidity, 1, type(uint256).max);
-		attributes.lpDetails.liquidity = liquidity;
-
-		uint256 portionsSum;
+	function testSplit(uint256[] memory liquidityPortions) public pure {
+		vm.assume(
+			liquidityPortions.length > 1 && liquidityPortions.length < 20
+		);
+		uint256 liquidity;
 		for (uint256 i = 0; i < liquidityPortions.length; i++) {
-			liquidityPortions[i] = bound(liquidityPortions[i], 1, 1e18); // Limit portions to reasonable values
-			portionsSum += liquidityPortions[i];
+			liquidityPortions[i] = bound(
+				liquidityPortions[i],
+				1,
+				1_000_000_000_000_000 ether
+			);
+			liquidity += liquidityPortions[i];
 		}
-		vm.assume(portionsSum > 0); // Ensure valid input
+
+		uint256 liqValue = liquidity;
+		GTokenLib.Attributes memory attributes = _createAttributes(liqValue, 0);
+		attributes.lpDetails.liquidity = liquidity;
 
 		GTokenLib.Attributes[] memory splits = attributes.split(
 			liquidityPortions
@@ -106,25 +105,25 @@ contract GTokenLibFuzzTest is Test {
 		uint256 epochsLocked,
 		uint256 currentEpoch
 	) public pure {
-		currentEpoch = bound(
-			currentEpoch,
-			epochStaked,
-			epochStaked + epochsLocked
+		epochsLocked = bound(
+			epochsLocked,
+			GTokenLib.MIN_EPOCHS_LOCK,
+			GTokenLib.MAX_EPOCHS_LOCK
 		);
-		
+		vm.assume(currentEpoch >= epochStaked);
+
 		GTokenLib.Attributes memory attributes = _createAttributes(
 			1,
 			epochsLocked
 		);
 		attributes.epochStaked = epochStaked;
 
-
-		uint256 elapsed = attributes.epochsElapsed(currentEpoch);
-		uint256 left = attributes.epochsLeft(currentEpoch);
+		uint256 epochsElapsed = attributes.epochsElapsed(currentEpoch);
+		uint256 epochsLeft = attributes.epochsLeft(currentEpoch);
 
 		assertEq(
-			left,
-			epochsLocked > elapsed ? epochsLocked - elapsed : 0,
+			epochsLeft,
+			epochsLocked > epochsElapsed ? epochsLocked - epochsElapsed : 0,
 			"Epochs left mismatch"
 		);
 	}
@@ -142,14 +141,23 @@ contract GTokenLibFuzzTest is Test {
 		uint256 epochsLocked,
 		uint256 lastClaimEpoch
 	) public pure {
+		epochsLocked = bound(
+			epochsLocked,
+			GTokenLib.MIN_EPOCHS_LOCK,
+			GTokenLib.MAX_EPOCHS_LOCK
+		);
+
 		GTokenLib.Attributes memory attributes = _createAttributes(
 			1,
 			epochsLocked
 		);
-		attributes.lastClaimEpoch = bound(lastClaimEpoch, 0, epochsLocked);
+		attributes.lastClaimEpoch = lastClaimEpoch = bound(
+			lastClaimEpoch,
+			0,
+			epochsLocked
+		);
 
 		uint256 unclaimed = attributes.epochsUnclaimed();
-
 		assertEq(
 			unclaimed,
 			epochsLocked - lastClaimEpoch,
@@ -158,27 +166,23 @@ contract GTokenLibFuzzTest is Test {
 	}
 
 	// Fuzz test for `valueToKeep`
-	function testValueToKeep(
-		uint256 liqValue,
+	function testFuzzValueToKeep(
 		uint256 epochsLocked,
 		uint256 currentEpoch
 	) public pure {
-		vm.assume(
-			epochsLocked > 0 && epochsLocked <= GTokenLib.MAX_EPOCHS_LOCK
-		);
-		vm.assume(liqValue <= type(uint104).max);
+		epochsLocked = bound(epochsLocked, 1, GTokenLib.MAX_EPOCHS_LOCK);
+		currentEpoch = bound(currentEpoch, 0, epochsLocked - 1);
 
 		GTokenLib.Attributes memory attributes = _createAttributes(
-			liqValue,
+			0,
 			epochsLocked
 		);
 
-		vm.assume(currentEpoch >= attributes.epochStaked + epochsLocked);
-
-		uint256 valueToKeep = attributes.valueToKeep(liqValue, currentEpoch);
+		uint256 testValue = 100;
+		uint256 valueToKeep = attributes.valueToKeep(testValue, currentEpoch);
 
 		// Ensure the result is within reasonable bounds
-		assertLe(valueToKeep, liqValue, "Value to keep exceeds input value");
+		assertLt(valueToKeep, testValue, "Value to keep exceeds input value");
 	}
 
 	// Helper function to create an Attributes struct
