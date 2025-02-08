@@ -21,6 +21,14 @@ contract GToken is SFT {
 	using GTokenLib for GTokenLib.Attributes;
 	using Epochs for Epochs.Storage;
 
+	event GTokenTransfer(
+		address indexed from,
+		address indexed to,
+		uint256 id,
+		uint256 stakeWeight,
+		uint256 supply
+	);
+
 	/// @custom:storage-location erc7201:gainz.GToken.storage
 	struct GTokenStorage {
 		uint256 totalStakeWeight;
@@ -78,7 +86,7 @@ contract GToken is SFT {
 				stakeWeight: 0,
 				lpDetails: lpDetails
 			})
-			.computeStakeWeight(currentEpoch);
+			.computeStakeWeight();
 
 		// Mint the GToken with the specified attributes and return the token ID
 		return _mint(to, attributes.supply(), abi.encode(attributes));
@@ -89,9 +97,7 @@ contract GToken is SFT {
 		uint256 nonce,
 		GTokenLib.Attributes memory attr
 	) external canUpdate returns (uint256) {
-		attr = attr.computeStakeWeight(
-			_getGTokenStorage().epochs.currentEpoch()
-		);
+		attr = attr.computeStakeWeight();
 		return super.update(user, nonce, attr.supply(), abi.encode(attr));
 	}
 
@@ -257,6 +263,8 @@ contract GToken is SFT {
 				$.totalSupply -= supply;
 				$.pairSupply[attr.lpDetails.pair] -= supply;
 			}
+
+			emit GTokenTransfer(from, to, id, attr.stakeWeight, supply);
 		}
 	}
 
