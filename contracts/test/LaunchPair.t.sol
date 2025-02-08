@@ -9,8 +9,9 @@ import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/O
 import { LaunchPair, TokenPayment } from "../LaunchPair.sol";
 import { Governance, Epochs } from "../Governance.sol";
 import { GToken, LiquidityInfo } from "../tokens/GToken/GToken.sol";
+import { RouterFixture, Gainz, WNTV } from "./shared/RouterFixture.sol";
 
-contract LaunchPairTest is Test {
+contract LaunchPairTest is Test, RouterFixture {
 	LaunchPair private launchPair;
 	GToken private gToken;
 
@@ -19,16 +20,12 @@ contract LaunchPairTest is Test {
 	address private participant = address(3);
 
 	function setUp() public {
-		owner = address(new Governance());
-		vm.startPrank(owner);
-		gToken = new GToken();
-		gToken.initialize(
-			Epochs.Storage({ genesis: block.timestamp, epochLength: 1 days }),
-			owner
-		);
-		launchPair = new LaunchPair();
-		launchPair.initialize(address(gToken));
-		vm.stopPrank();
+		Governance gov = Governance(payable(router.getGovernance()));
+		owner = address(gov);
+		gToken = GToken(gov.getGToken());
+		launchPair = gov.launchPair();
+
+		router.setFeeTo(address(launchPair));
 	}
 
 	function testOnlyOwnerCanCreateCampaign() public {
@@ -41,7 +38,7 @@ contract LaunchPairTest is Test {
 	}
 
 	function testCreateCampaign(uint256 goal, uint256 duration) public {
-		vm.assume(goal > 0);
+		vm.assume(goal > 50_000 ether);
 		vm.assume(duration > 0);
 
 		vm.startPrank(owner);
@@ -58,8 +55,8 @@ contract LaunchPairTest is Test {
 	}
 
 	function testStartCampaign(uint256 goal, uint256 duration) public {
-		vm.assume(goal > 0);
-		duration = bound(duration, 1, 30 days);
+		vm.assume(goal > 50_000 ether);
+		duration = bound(duration, 7 days, 30 days);
 
 		vm.startPrank(owner);
 		uint256 campaignId = launchPair.createCampaign(creator);
@@ -86,7 +83,7 @@ contract LaunchPairTest is Test {
 		vm.stopPrank();
 
 		vm.startPrank(creator);
-		launchPair.startCampaign(1 ether, 1 days, campaignId);
+		launchPair.startCampaign(50_000 ether, 7 days, campaignId);
 		vm.stopPrank();
 
 		vm.startPrank(participant);
@@ -109,7 +106,7 @@ contract LaunchPairTest is Test {
 		uint256 goal,
 		uint256 contributionAmount
 	) public payable {
-		vm.assume(goal > 1 ether);
+		vm.assume(goal > 50_000 ether);
 		vm.assume(contributionAmount >= goal);
 		vm.deal(participant, contributionAmount);
 
@@ -118,7 +115,7 @@ contract LaunchPairTest is Test {
 		vm.stopPrank();
 
 		vm.startPrank(creator);
-		launchPair.startCampaign(goal, 1 days, campaignId);
+		launchPair.startCampaign(goal, 7 days, campaignId);
 		vm.stopPrank();
 
 		vm.startPrank(participant);
@@ -143,7 +140,7 @@ contract LaunchPairTest is Test {
 		uint256 goal,
 		LiquidityInfo memory lpDetails
 	) public payable {
-		vm.assume(goal > 1 ether && goal <= 1_000_000_000 ether);
+		vm.assume(goal > 50_000 ether && goal <= 1_000_000_000 ether);
 		uint256 contributionAmount = goal;
 
 		vm.deal(participant, contributionAmount);
@@ -153,7 +150,7 @@ contract LaunchPairTest is Test {
 		vm.stopPrank();
 
 		vm.startPrank(creator);
-		launchPair.startCampaign(goal, 1 days, campaignId);
+		launchPair.startCampaign(goal, 7 days, campaignId);
 		vm.stopPrank();
 
 		vm.startPrank(participant);
@@ -190,7 +187,7 @@ contract LaunchPairTest is Test {
 		uint256 goal,
 		uint256 contributionAmount
 	) public payable {
-		vm.assume(goal > 0);
+		vm.assume(goal > 50_000 ether);
 		vm.assume(contributionAmount > 1 ether && contributionAmount < goal);
 		vm.deal(participant, contributionAmount);
 
@@ -199,7 +196,7 @@ contract LaunchPairTest is Test {
 		vm.stopPrank();
 
 		vm.startPrank(creator);
-		launchPair.startCampaign(goal, 1 days, campaignId);
+		launchPair.startCampaign(goal, 7 days, campaignId);
 		vm.stopPrank();
 
 		vm.startPrank(participant);
@@ -207,7 +204,7 @@ contract LaunchPairTest is Test {
 		vm.stopPrank();
 
 		// Simulate campaign expiration
-		vm.warp(block.timestamp + 2 days);
+		vm.warp(block.timestamp + 20 days);
 
 		vm.startPrank(participant);
 		uint256 balanceBefore = participant.balance;

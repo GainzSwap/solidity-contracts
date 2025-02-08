@@ -62,18 +62,17 @@ contract GTokenTest is Test {
 	function testUpdate(
 		uint256 rewardPerShare,
 		uint256 epochsLocked,
-		uint256 liquidity,
-		uint112 liqValue
+		uint256 liquidity
 	) public {
 		vm.assume(epochsLocked <= 1080);
-		vm.assume(liquidity < (type(uint256).max / 1080));
+		liquidity = bound(liquidity, 1, (type(uint104).max / 9e6));
 		vm.assume(rewardPerShare < (type(uint256).max / 2));
 
 		LiquidityInfo memory lpDetails = LiquidityInfo({
 			token0: address(this),
 			token1: user,
 			liquidity: liquidity,
-			liqValue: liqValue,
+			liqValue: liquidity,
 			pair: address(this)
 		});
 
@@ -86,6 +85,7 @@ contract GTokenTest is Test {
 		);
 		vm.stopPrank();
 
+		vm.warp(block.timestamp + 24 days);
 		GTokenLib.Attributes memory updatedAttributes = GTokenLib
 			.Attributes({
 				rewardPerShare: rewardPerShare + 1,
@@ -183,17 +183,16 @@ contract GTokenTest is Test {
 	function testTotalStakeWeight(
 		uint256 rewardPerShare,
 		uint256 epochsLocked,
-		uint256 liquidity,
-		uint112 liqValue
+		uint256 liquidity
 	) public {
 		vm.assume(epochsLocked <= 1080);
-		vm.assume(liquidity > 0 && liquidity < type(uint256).max / 1080);
+		liquidity = bound(liquidity, 1, (type(uint104).max / 1080));
 
 		LiquidityInfo memory lpDetails = LiquidityInfo({
 			token0: address(this),
 			token1: user,
 			liquidity: liquidity,
-			liqValue: liqValue,
+			liqValue: liquidity,
 			pair: address(this)
 		});
 

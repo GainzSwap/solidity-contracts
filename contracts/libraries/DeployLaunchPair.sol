@@ -24,6 +24,6 @@ library DeployLaunchPair {
 		);
 
 		// Cast the proxy to the LaunchPair type and return it
-		return LaunchPair(address(proxy));
+		return LaunchPair(payable(address(proxy)));
 	}
 }

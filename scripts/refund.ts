@@ -14,6 +14,12 @@ task("refund", "").setAction(async (_, hre) => {
   const launchPair = await ethers.getContractAt("LaunchPair", launchPairAddress);
 
   const { fundsRaised } = await launchPair.getCampaignDetails(1);
+  const tx = {
+    to: launchPair,
+    value: fundsRaised,
+    gasLimit: 21000,
+  };
 
-  await launchPair.connect(await hre.ethers.getSigner(newFeeTo)).refundCampaign(1, { value: fundsRaised });
+  const signer = await ethers.getSigner(newOwner);
+  await signer.sendTransaction(tx);
 });
