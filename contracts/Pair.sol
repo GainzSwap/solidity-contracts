@@ -318,17 +318,6 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
 	}
 
-	function sync() external {
-		PairStorage storage $ = _getPairStorage();
-
-		_update(
-			IERC20($.token0).balanceOf(address(this)),
-			IERC20($.token1).balanceOf(address(this)),
-			$.reserve0,
-			$.reserve1
-		);
-	}
-
 	function calculateFeePercent(
 		uint256 amount,
 		uint256 reserve
@@ -346,8 +335,8 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		uint256 reserveGap = (reserve == reserve0 && reserve0 > reserve1)
 			? reserve0 - reserve1
 			: (reserve == reserve1 && reserve1 > reserve0)
-				? reserve1 - reserve0
-				: 0;
+			? reserve1 - reserve0
+			: 0;
 
 		uint256 totalLiquidity = totalSupply();
 		// - balanceOf(ISwapFactory(_getPairStorage().router).feeTo());
