@@ -209,9 +209,9 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 			campaign.gtokenNonce == 0,
 			"Launchpair: Campaign received gToken already"
 		);
+		campaign.gtokenNonce = payment.nonce;
 
 		payment.receiveSFT();
-		campaign.gtokenNonce = payment.nonce;
 	}
 
 	/**
@@ -226,7 +226,9 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		uint256 _campaignId
 	) external onlyCreator(_campaignId) {
 		require(
-			_goal > 0 && _duration > 0 && _duration <= 180 days,
+			_goal >= 25_000 ether &&
+				_duration >= 7 days &&
+				_duration <= 180 days,
 			"Invalid input"
 		);
 		MainStorage storage $ = _getMainStorage();
@@ -282,7 +284,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 			$.userCampaigns[msg.sender].add(_campaignId);
 		}
 
-		router.register(msg.sender, referrerId);
+		if (referrerId > 0) router.register(msg.sender, referrerId);
 
 		emit ContributionMade(_campaignId, msg.sender, weiAmount);
 	}
@@ -369,11 +371,12 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 
 			// Calculate user's liquidity share based on contribution proportion.
 			uint256 contribution = $.contributions[_campaignId][msg.sender];
-			$.contributions[_campaignId][msg.sender] = 0;
 			require(
 				contribution > 0,
 				"No contributions from sender in this campaign"
 			);
+			$.contributions[_campaignId][msg.sender] = 0;
+			_removeCampaignFromUserCampaigns(msg.sender, _campaignId);
 
 			uint256 unUsedContributions = gTokenBalance.amount;
 			assert(
@@ -410,9 +413,6 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 			gTokenNonce = nonces[1];
 		}
 
-		// Remove the campaign from the user's participation list.
-		_removeCampaignFromUserCampaigns(msg.sender, _campaignId);
-
 		emit TokensDistributed(
 			_campaignId,
 			gTokenNonce,
@@ -445,13 +445,12 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		require(amount > 0, "No contributions to refund");
 
 		$.contributions[_campaignId][msg.sender] = 0;
-		payable(msg.sender).transfer(amount);
+		_removeCampaignFromUserCampaigns(msg.sender, _campaignId);
 
 		// Update the status to Failed
 		campaign.status = CampaignStatus.Failed;
 
-		// Remove the campaign from the user's participated campaigns after refund
-		_removeCampaignFromUserCampaigns(msg.sender, _campaignId);
+		payable(msg.sender).transfer(amount);
 
 		emit RefundIssued(_campaignId, msg.sender, amount);
 	}
