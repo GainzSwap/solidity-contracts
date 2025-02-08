@@ -77,22 +77,11 @@ abstract contract PairERC20 is Initializable, IERC20, IERC20Errors {
 		emit Transfer(from, address(0), value);
 	}
 
-	function _approve(address owner, address spender, uint value) private {
-		PairERC20Storage storage $ = _getPairERC20Storage();
-		$.allowance[owner][spender] = value;
-		emit Approval(owner, spender, value);
-	}
-
 	function _transfer(address from, address to, uint value) private {
 		PairERC20Storage storage $ = _getPairERC20Storage();
 		$.balanceOf[from] -= (value);
 		$.balanceOf[to] += (value);
 		emit Transfer(from, to, value);
-	}
-
-	function approve(address spender, uint value) external returns (bool) {
-		_approve(msg.sender, spender, value);
-		return true;
 	}
 
 	function transfer(address to, uint value) external returns (bool) {
@@ -122,40 +111,6 @@ abstract contract PairERC20 is Initializable, IERC20, IERC20Errors {
 		return true;
 	}
 
-	function permit(
-		address owner,
-		address spender,
-		uint value,
-		uint deadline,
-		uint8 v,
-		bytes32 r,
-		bytes32 s
-	) external {
-		require(deadline >= block.timestamp, "PairERC20: EXPIRED");
-		bytes32 digest = keccak256(
-			abi.encodePacked(
-				"\x19\x01",
-				DOMAIN_SEPARATOR(),
-				keccak256(
-					abi.encode(
-						PERMIT_TYPEHASH,
-						owner,
-						spender,
-						value,
-						nonces[owner]++,
-						deadline
-					)
-				)
-			)
-		);
-		address recoveredAddress = ecrecover(digest, v, r, s);
-		require(
-			recoveredAddress != address(0) && recoveredAddress == owner,
-			"PairERC20: INVALID_SIGNATURE"
-		);
-		_approve(owner, spender, value);
-	}
-
 	function totalSupply() public view override returns (uint256) {
 		PairERC20Storage storage $ = _getPairERC20Storage();
 
@@ -171,9 +126,14 @@ abstract contract PairERC20 is Initializable, IERC20, IERC20Errors {
 	function allowance(
 		address owner,
 		address spender
-	) public view virtual returns (uint256) {
-		PairERC20Storage storage $ = _getPairERC20Storage();
+	) public pure virtual returns (uint256) {
+		revert("Not Implemented");
+	}
 
-		return $.allowance[owner][spender];
+	function approve(
+		address spender,
+		uint256 value
+	) external pure returns (bool) {
+		revert("Not Implemented");
 	}
 }
