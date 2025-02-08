@@ -95,7 +95,7 @@ contract GTokenTest is Test {
 				stakeWeight: 0,
 				lpDetails: lpDetails
 			})
-			.computeStakeWeight(epochs.currentEpoch());
+			.computeStakeWeight();
 
 		vm.startPrank(owner);
 		uint256 newTokenId = gToken.update(user, tokenId, updatedAttributes);
