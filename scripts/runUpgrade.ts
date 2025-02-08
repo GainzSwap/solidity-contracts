@@ -107,7 +107,7 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
     launchPairAddress,
     await hre.ethers.getContractFactory("LaunchPair", { signer: deployerSigner }),
   );
-  await hre.upgrades.upgradeProxy(
+  const newLaunchPair = await hre.upgrades.upgradeProxy(
     launchPairAddress,
     await hre.ethers.getContractFactory("LaunchPair", { signer: deployerSigner }),
     {
@@ -140,4 +140,6 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
 
   // Run any additional tasks, such as generating TypeScript ABIs
   await hre.deployments.run("generateTsAbis");
+
+  await newLaunchPair.transferOwnership(govAddress);
 });
