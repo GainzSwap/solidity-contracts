@@ -247,6 +247,15 @@ contract Router is
 		}
 	}
 
+	error CreatePairUnauthorized();
+	modifier canCreatePair() {
+		RouterStorage storage $ = _getRouterStorage();
+
+		if (msg.sender != owner() && msg.sender != $.governance)
+			revert CreatePairUnauthorized();
+		_;
+	}
+
 	// **** INITIALIZATION ****
 
 	function initialize(
@@ -292,11 +301,10 @@ contract Router is
 		external
 		payable
 		override
+		canCreatePair
 		returns (address pairAddress, uint256 liquidity)
 	{
 		address govAddr = _getRouterStorage().governance;
-		require(msg.sender == govAddr, "Not open for all");
-
 		Governance governance = Governance(payable(govAddr));
 		bool isTokenAInFunding = governance.pairListing(paymentA.token).owner !=
 			address(0);
