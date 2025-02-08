@@ -92,6 +92,32 @@ library GovernanceLib {
 		);
 	}
 
+	function _claimRewards(
+		Governance.GovernanceStorage storage $,
+		address user,
+		uint256 nonce
+	)
+		internal
+		returns (
+			uint256 claimableReward,
+			GTokenLib.Attributes memory attributes
+		)
+	{
+		// Calculate rewards to be claimed on unstaking
+		(claimableReward, attributes) = _calculateClaimableReward(
+			user,
+			nonce,
+			$.gtoken,
+			$.rewardPerShare
+		);
+
+		// Transfer the claimable rewards to the user, if any
+		if (claimableReward > 0) {
+			$.rewardsReserve -= claimableReward;
+			IERC20($.gainzToken).transfer(user, claimableReward);
+		}
+	}
+
 	function unStake(
 		Governance.GovernanceStorage storage $,
 		uint256 nonce,
@@ -101,66 +127,54 @@ library GovernanceLib {
 		Gainz($.gainzToken).mintGainz();
 
 		address user = msg.sender;
-
-		// Calculate rewards to be claimed on unstaking
-		(
-			uint256 claimableReward,
-			GTokenLib.Attributes memory attributes
-		) = _calculateClaimableReward(user, nonce, $.gtoken, $.rewardPerShare);
-
-		// Transfer the claimable rewards to the user, if any
-		if (claimableReward > 0) {
-			$.rewardsReserve -= claimableReward;
-			IERC20($.gainzToken).transfer(user, claimableReward);
-		}
-
-		// Calculate the amount of GToken tokens to return to the user
+		(, GTokenLib.Attributes memory attributes) = _claimRewards(
+			$,
+			user,
+			nonce
+		);
 		uint256 liquidity = attributes.lpDetails.liquidity;
 		uint256 liquidityToReturn = attributes.epochsLocked == 0
 			? liquidity
 			: attributes.valueToKeep(liquidity, $.epochs.currentEpoch());
-
-		Pair pair = Pair(
-			PriceOracle(OracleLibrary.oracleAddress($.router)).pairFor(
-				attributes.lpDetails.token0,
-				attributes.lpDetails.token1
-			)
-		);
-
 		if (liquidityToReturn < liquidity) {
-			address feeTo = Router(payable($.router)).feeTo();
-			require(
-				feeTo != address(0) && feeTo != address(this),
-				"Governance: INVALID_FEE_TO_ADDRESS"
-			);
+			// TODO we should have an account that collects this at interval from Governace and keeps the liquidity forever.
+			// address feeTo = Router(payable($.router)).feeTo();
+			// require(
+			// 	feeTo != address(0) && feeTo != address(this),
+			// 	"Governance: INVALID_FEE_TO_ADDRESS"
+			// );
 
-			pair.transfer(feeTo, liquidity - liquidityToReturn);
+			// pair.transfer(feeTo, liquidity - liquidityToReturn);
 
 			// Adjust slippage accordingly
 			amount0Min = (amount0Min * liquidityToReturn) / liquidity;
 			amount1Min = (amount1Min * liquidityToReturn) / liquidity;
 		}
 
-		// Transfer GToken tokens back to the user
-		pair.approve($.router, liquidityToReturn);
-		(uint256 amount0, uint256 amount1) = Router(payable($.router))
-			.removeLiquidity(
-				attributes.lpDetails.token0,
-				attributes.lpDetails.token1,
-				liquidityToReturn,
-				amount0Min,
-				amount1Min,
-				address(this),
-				block.timestamp + 1
-			);
-
 		// Set these values to 0 and updating the atttributes at nonce effectively burns the token
 		attributes.lpDetails.liquidity = 0;
 		attributes.lpDetails.liqValue = 0;
 		nonce = GToken($.gtoken).update(user, nonce, attributes);
 
-		attributes.lpDetails.token0.sendFungibleToken(amount0, user);
-		attributes.lpDetails.token1.sendFungibleToken(amount1, user);
+		address token0 = attributes.lpDetails.token0;
+		address token1 = attributes.lpDetails.token1;
+
+		Pair(
+			PriceOracle(OracleLibrary.oracleAddress($.router)).pairFor(
+				token0,
+				token1
+			)
+		).approve($.router, liquidityToReturn);
+		Router(payable($.router))
+			.removeLiquidity(
+				token0,
+				token1,
+				liquidityToReturn,
+				amount0Min,
+				amount1Min,
+				user,
+				block.timestamp + 1
+			);
 	}
 
 	function proposeNewPairListing(
@@ -513,20 +527,13 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		(
 			uint256 claimableReward,
 			GTokenLib.Attributes memory attributes
-		) = GovernanceLib._calculateClaimableReward(
-				user,
-				nonce,
-				$.gtoken,
-				$.rewardPerShare
-			);
+		) = GovernanceLib._claimRewards($, user, nonce);
 
 		require(claimableReward > 0, "Governance: No rewards to claim");
 
-		$.rewardsReserve -= claimableReward;
 		attributes.rewardPerShare = $.rewardPerShare;
 		attributes.lastClaimEpoch = $.epochs.currentEpoch();
 
-		IERC20($.gainzToken).transfer(user, claimableReward);
 		return GToken($.gtoken).update(user, nonce, attributes);
 	}
 

@@ -23,16 +23,15 @@ library GTokenLib {
 	// Constants for lock periods and percentage loss calculations
 	uint256 public constant MIN_EPOCHS_LOCK = 0;
 	uint256 public constant MAX_EPOCHS_LOCK = 1080;
-	uint256 public constant MIN_EPOCHS_LOCK_PERCENT_LOSS = 55e4; // 55% in basis points
-	uint256 public constant MAX_EPOCHS_LOCK_PERCENT_LOSS = 15e4; // 15% in basis points
+	uint256 public constant MIN_EPOCHS_LOCK_PERCENT_LOSS = 30e4; // 30% in basis points
+	uint256 public constant MAX_EPOCHS_LOCK_PERCENT_LOSS = 5e4; // 5% in basis points
 	uint256 public constant MAX_PERCENT_LOSS = 100e4; // 100% in basis points
 
 	/// @notice Computes the stake weight based on the amount of LP tokens and the epochs locked.
 	/// @param self The Attributes struct of the participant.
 	/// @return The updated Attributes struct with the computed stake weight.
 	function computeStakeWeight(
-		Attributes memory self,
-		uint256 currentEpoch
+		Attributes memory self
 	) internal pure returns (Attributes memory) {
 		uint256 epochsLocked = self.epochsLocked;
 		require(
@@ -40,12 +39,15 @@ library GTokenLib {
 			"GToken: Invalid epochsLocked"
 		);
 
+		uint256 liqValue = self.lpDetails.liqValue;
 		if (self.lpDetails.liquidity == 0) {
-			self.lpDetails.liqValue = 0;
+			require(liqValue == 0, "GTokenLib: Liquidity Value Too high");
+		} else {
+			require(liqValue > 0, "GTokenLib: Invalid GToken Liquidity");
 		}
 
 		// Calculate stake weight based on supply and epochs locked
-		self.stakeWeight = votePower(self, currentEpoch);
+		self.stakeWeight = liqValue * epochsLocked;
 
 		return self;
 	}

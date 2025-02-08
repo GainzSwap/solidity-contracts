@@ -77,11 +77,22 @@ abstract contract PairERC20 is Initializable, IERC20, IERC20Errors {
 		emit Transfer(from, address(0), value);
 	}
 
+	function _approve(address owner, address spender, uint value) private {
+		PairERC20Storage storage $ = _getPairERC20Storage();
+		$.allowance[owner][spender] = value;
+		emit Approval(owner, spender, value);
+	}
+
 	function _transfer(address from, address to, uint value) private {
 		PairERC20Storage storage $ = _getPairERC20Storage();
 		$.balanceOf[from] -= (value);
 		$.balanceOf[to] += (value);
 		emit Transfer(from, to, value);
+	}
+
+	function approve(address spender, uint value) external returns (bool) {
+		_approve(msg.sender, spender, value);
+		return true;
 	}
 
 	function transfer(address to, uint value) external returns (bool) {
@@ -126,14 +137,9 @@ abstract contract PairERC20 is Initializable, IERC20, IERC20Errors {
 	function allowance(
 		address owner,
 		address spender
-	) public pure virtual returns (uint256) {
-		revert("Not Implemented");
-	}
+	) public view virtual returns (uint256) {
+		PairERC20Storage storage $ = _getPairERC20Storage();
 
-	function approve(
-		address spender,
-		uint256 value
-	) external pure returns (bool) {
-		revert("Not Implemented");
+		return $.allowance[owner][spender];
 	}
 }
