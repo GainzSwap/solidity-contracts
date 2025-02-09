@@ -4,9 +4,9 @@ pragma solidity ^0.8.28;
 import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-/// @title dEDU (Delegated EDU)
+/// @title WNTV (Delegated EDU)
 /// @notice GainzSwap's delegated EDU staking mechanism. Also powers EDU liquidity on the DEX
-contract dEDU is ERC20Upgradeable, OwnableUpgradeable {
+contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 	struct UserWithdrawal {
 		uint256 amount;
 		uint256 readyTimestamp;
@@ -76,8 +76,8 @@ contract dEDU is ERC20Upgradeable, OwnableUpgradeable {
 		_getWNTVStorage().pendingWithdrawals -= msg.value;
 	}
 
-	/// @notice Initiates a withdrawal request for dEDU tokens.
-	/// @param amount The amount of dEDU tokens to withdraw.
+	/// @notice Initiates a withdrawal request for WNTV tokens.
+	/// @param amount The amount of WNTV tokens to withdraw.
 	function withdraw(uint256 amount) public {
 		require(balanceOf(msg.sender) >= amount, "WNTV: Insufficient balance");
 		_burn(msg.sender, amount);
@@ -115,21 +115,21 @@ contract dEDU is ERC20Upgradeable, OwnableUpgradeable {
 	}
 
 	/// @notice Deposits native tokens and approves a spender to use them.
-	/// @param owner The address receiving the dEDU tokens.
+	/// @param owner The address receiving the WNTV tokens.
 	/// @param spender The address allowed to spend the tokens.
 	function receiveForSpender(address owner, address spender) public payable {
 		_stakeEDU(owner);
 		_approve(owner, spender, msg.value);
 	}
 
-	/// @notice Deposits native tokens and mints dEDU tokens for the sender.
-	/// @param owner The recipient of the minted dEDU tokens.
+	/// @notice Deposits native tokens and mints WNTV tokens for the sender.
+	/// @param owner The recipient of the minted WNTV tokens.
 	function receiveFor(address owner) public payable {
 		_stakeEDU(owner);
 	}
 
-	/// @dev Stakes native tokens with the Yuzu aggregator and mints dEDU tokens.
-	/// @param depositor The address receiving the dEDU tokens.
+	/// @dev Stakes native tokens with the Yuzu aggregator and mints WNTV tokens.
+	/// @param depositor The address receiving the WNTV tokens.
 	function _stakeEDU(address depositor) internal {
 		address yuzuAggregator_ = _getWNTVStorage().yuzuAggregator;
 		require(yuzuAggregator_ != address(0), "yuzuAggregator not set");

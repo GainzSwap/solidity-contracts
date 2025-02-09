@@ -7,7 +7,7 @@ import { Router } from "../Router.sol";
 import { TokenPayment, TokenPayments } from "../libraries/TokenPayments.sol";
 import { Epochs } from "../libraries/Epochs.sol";
 import { ERC1155Holder } from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import { RouterFixture, Gainz, dEDU } from "./shared/RouterFixture.sol";
+import { RouterFixture, Gainz, WNTV } from "./shared/RouterFixture.sol";
 
 contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 	Governance governance;

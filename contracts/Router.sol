@@ -20,7 +20,7 @@ import { AMMLibrary } from "./libraries/AMMLibrary.sol";
 import { TransferHelper } from "./libraries/TransferHelper.sol";
 import { Epochs } from "./libraries/Epochs.sol";
 
-import { dEDU } from "./tokens/WNTV.sol";
+import { WNTV } from "./tokens/WNTV.sol";
 
 import { Governance } from "./Governance.sol";
 import { PriceOracle } from "./PriceOracle.sol";
@@ -186,7 +186,7 @@ library RouterLib {
 					"Router: INVALID_AMOUNT_IN_VALUES"
 				);
 				require(path[0] == wNtvAddr, "Router: INVALID_PATH");
-				dEDU(payable(wNtvAddr)).receiveFor{ value: msg.value }(pair);
+				WNTV(payable(wNtvAddr)).receiveFor{ value: msg.value }(pair);
 			} else {
 				TransferHelper.safeTransferFrom(
 					path[0],

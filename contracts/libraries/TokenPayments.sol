@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 import { SFT } from "../abstracts/SFT.sol";
-import { dEDU } from "../tokens/WNTV.sol";
+import { WNTV } from "../tokens/WNTV.sol";
 
 import "hardhat/console.sol";
 
@@ -37,7 +37,7 @@ library TokenPayments {
 	) internal {
 		if (payment.token == address(0)) {
 			// Wrap native tokens for `to`
-			dEDU(payable(wNTV)).receiveFor{ value: payment.amount }(to);
+			WNTV(payable(wNTV)).receiveFor{ value: payment.amount }(to);
 		} else if (payment.nonce == 0) {
 			// ERC20 payment
 			// bytes4(keccak256(bytes('transferFrom(address,address,uint256)')));
