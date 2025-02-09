@@ -40,14 +40,7 @@ library TokenPayments {
 			WNTV(payable(wNTV)).receiveFor{ value: payment.amount }(to);
 		} else if (payment.nonce == 0) {
 			// ERC20 payment
-			// bytes4(keccak256(bytes('transferFrom(address,address,uint256)')));
-			(bool success, bytes memory data) = payment.token.call(
-				abi.encodeWithSelector(0x23b872dd, from, to, payment.amount)
-			);
-			require(
-				success && (data.length == 0 || abi.decode(data, (bool))),
-				"TokenPayments: transferFrom failed"
-			);
+			IERC20(payment.token).transferFrom(from, to, payment.amount);
 		} else {
 			// SFT payment
 			SFT(payment.token).safeTransferFrom(
@@ -65,14 +58,7 @@ library TokenPayments {
 		uint256 amount,
 		address to
 	) internal {
-		// bytes4(keccak256(bytes('transfer(address,uint256)')));
-		(bool success, bytes memory data) = token.call(
-			abi.encodeWithSelector(0xa9059cbb, to, amount)
-		);
-		require(
-			success && (data.length == 0 || abi.decode(data, (bool))),
-			"TokenPayments: sendFungibleToken failed"
-		);
+		IERC20(token).transfer(to, amount);
 	}
 
 	function sendToken(TokenPayment memory payment, address to) internal {
