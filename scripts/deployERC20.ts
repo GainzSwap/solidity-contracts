@@ -2,7 +2,7 @@ import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import dotenv from "dotenv";
 import { randomNumber } from "../utilities";
-import { parseEther, ZeroAddress } from "ethers";
+import { ZeroAddress } from "ethers";
 
 dotenv.config();
 
@@ -25,10 +25,10 @@ task("deployERC20", "")
       await token.mint(tester, hre.ethers.parseEther(randomNumber(50_000, 3_000_000).toFixed(15)));
     }
 
-   await hre.run("createPair", {
+    await hre.run("createPair", {
       tokenA: tokenAddress,
-      amountA: parseEther("1"),
+      amountA: "1",
       tokenB: ZeroAddress,
-      amountB: parseEther("3.3333333"),
+      amountB: "3.333",
     });
   });

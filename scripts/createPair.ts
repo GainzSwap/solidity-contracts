@@ -28,13 +28,12 @@ task("createPair", "Creates new pair via admin interaction")
       [
         { token: tokenA, amount: amountA },
         { token: tokenB, amount: amountB },
-      ].map(async ({ token: _token, amount }) => {
-        const token = await ethers.getContractAt("ERC20", _token);
-
-        if (_token == wNative) {
+      ].map(async ({ token, amount }) => {
+        if (token == wNative || token == ZeroAddress) {
           value = amount;
+          token = wNative;
         } else {
-          await token.approve(router, amount);
+          await (await ethers.getContractAt("ERC20", token)).approve(router, amount);
         }
 
         return { token, amount, nonce: 0 };
