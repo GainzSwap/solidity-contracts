@@ -19,7 +19,7 @@ import { DeployGToken } from "./libraries/DeployGToken.sol";
 import { DeployLaunchPair } from "./libraries/DeployLaunchPair.sol";
 
 import { GToken, GTokenLib, GTokenBalance } from "./tokens/GToken/GToken.sol";
-import { WNTV } from "./tokens/WNTV.sol";
+import { dEDU } from "./tokens/WNTV.sol";
 import { Gainz } from "./tokens/Gainz/Gainz.sol";
 
 import { Pair } from "./Pair.sol";

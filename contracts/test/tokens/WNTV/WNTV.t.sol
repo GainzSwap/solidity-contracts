@@ -3,13 +3,13 @@ pragma solidity ^0.8.28;
 
 import { Test } from "forge-std/Test.sol";
 import { Test } from "forge-std/Test.sol";
-import { WNTV } from "../../../tokens/WNTV.sol";
+import { dEDU } from "../../../tokens/WNTV.sol";
 
 contract WNTVTest is Test {
-	WNTV wntv;
+	dEDU wntv;
 
 	function setUp() external {
-		wntv = new WNTV();
+		wntv = new dEDU();
 		wntv.initialize();
 		wntv.setup();
 		wntv.setYuzuAggregator(address(this));
@@ -39,7 +39,7 @@ contract WNTVTest is Test {
 		wntv.withdraw(amount);
 		vm.stopPrank();
 
-		WNTV.UserWithdrawal memory withdrawal = wntv.userPendingWithdrawals(
+		dEDU.UserWithdrawal memory withdrawal = wntv.userPendingWithdrawals(
 			owner
 		);
 		assertEq(withdrawal.amount, amount, "Withdrawal amount not match");

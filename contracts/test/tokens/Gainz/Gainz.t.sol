@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { Test, console } from "forge-std/Test.sol";
-import { RouterFixture, Gainz, WNTV } from "../../shared/RouterFixture.sol";
+import { RouterFixture, Gainz } from "../../shared/RouterFixture.sol";
 import { Governance } from "../../../Governance.sol";
 
 contract GainzTest is Test, RouterFixture {

@@ -10,14 +10,14 @@ import { StdCheats } from "forge-std/StdCheats.sol";
 import { StdUtils } from "forge-std/StdUtils.sol";
 import { console } from "forge-std/console.sol";
 import { AddressSet, LibAddressSet } from "./helpers/AddressSet.sol";
-import { WNTV } from "../../../tokens/WNTV.sol";
+import { dEDU } from "../../../tokens/WNTV.sol";
 
 uint256 constant ETH_SUPPLY = 1_000_000_000 ether;
 
 contract Handler is CommonBase, StdCheats, StdUtils {
 	using LibAddressSet for AddressSet;
 
-	WNTV public weth;
+	dEDU public weth;
 	address public yuzuAggregator = address(15);
 
 	uint256 public ghost_depositSum;
@@ -53,7 +53,7 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 		_;
 	}
 
-	constructor(WNTV _weth) {
+	constructor(dEDU _weth) {
 		weth = _weth;
 
 		weth.initialize();
@@ -89,7 +89,7 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 			}
 		}
 
-		WNTV.UserWithdrawal memory withdrawal = weth.userPendingWithdrawals(
+		dEDU.UserWithdrawal memory withdrawal = weth.userPendingWithdrawals(
 			currentActor
 		);
 
@@ -112,7 +112,7 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 
 		ghost_withdrawSum += amount;
 
-		WNTV.UserWithdrawal memory withdrawal = weth.userPendingWithdrawals(
+		dEDU.UserWithdrawal memory withdrawal = weth.userPendingWithdrawals(
 			currentActor
 		);
 		// Properly warp time so balnces are not affected
@@ -225,12 +225,12 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 	receive() external payable {}
 }
 
-contract WNTVInvariants is Test {
-	WNTV public weth;
+contract dEDUInvariants is Test {
+	dEDU public weth;
 	Handler public handler;
 
 	function setUp() public {
-		weth = new WNTV();
+		weth = new dEDU();
 		handler = new Handler(weth);
 
 		bytes4[] memory selectors = new bytes4[](7);

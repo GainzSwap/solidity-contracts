@@ -9,7 +9,7 @@ import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/O
 import { LaunchPair, TokenPayment } from "../LaunchPair.sol";
 import { Governance, Epochs } from "../Governance.sol";
 import { GToken, LiquidityInfo } from "../tokens/GToken/GToken.sol";
-import { RouterFixture, Gainz, WNTV } from "./shared/RouterFixture.sol";
+import { RouterFixture, Gainz } from "./shared/RouterFixture.sol";
 
 contract LaunchPairTest is Test, RouterFixture {
 	LaunchPair private launchPair;

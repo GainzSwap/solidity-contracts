@@ -20,7 +20,7 @@ import { AMMLibrary } from "./libraries/AMMLibrary.sol";
 import { TransferHelper } from "./libraries/TransferHelper.sol";
 import { Epochs } from "./libraries/Epochs.sol";
 
-import { WNTV } from "./tokens/WNTV.sol";
+import { dEDU } from "./tokens/WNTV.sol";
 
 import { Governance } from "./Governance.sol";
 import { PriceOracle } from "./PriceOracle.sol";
@@ -187,7 +187,7 @@ library RouterLib {
 					"Router: INVALID_AMOUNT_IN_VALUES"
 				);
 				require(path[0] == wNtvAddr, "Router: INVALID_PATH");
-				WNTV(payable(wNtvAddr)).receiveFor{ value: msg.value }(pair);
+				dEDU(payable(wNtvAddr)).receiveFor{ value: msg.value }(pair);
 			} else {
 				TransferHelper.safeTransferFrom(
 					path[0],
@@ -275,7 +275,7 @@ contract Router is
 			new UpgradeableBeacon(address(new Pair()), $.proxyAdmin)
 		);
 
-		// set Wrapped Native Token;
+		// set Delegated EDU;
 		$.wNativeToken = DeployWNTV.create($.proxyAdmin);
 		$.governance = DeployGovernance.create(
 			$.epochs,
