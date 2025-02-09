@@ -94,6 +94,8 @@ async function saveLibraries(libraries: Record<string, string>, contractName: st
 }
 
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { Router } from "./typechain-types";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 export async function getDeploymentTxHashFromNetwork(
   hre: HardhatRuntimeEnvironment,
@@ -146,4 +148,31 @@ export function randomNumber(min: number, max: number) {
 
 export function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export async function getSwapTokens(router: Router, ethers: typeof e) {
+  const pairs = await router.pairs();
+  const swapTokens: string[] = [];
+  const swapTokenPath: Record<string, [string, string]> = {};
+
+  for (const address of pairs) {
+    const pair = await ethers.getContractAt("Pair", address);
+    const token0 = await pair.token0();
+    const token1 = await pair.token1();
+
+    !swapTokens.includes(token0) && swapTokens.push(token0);
+    !swapTokens.includes(token1) && swapTokens.push(token1);
+
+    swapTokenPath[token0 + token1] = [token1, token0];
+    swapTokenPath[token1 + token0] = [token0, token1];
+  }
+
+  return { swapTokens, swapTokenPath };
+}
+
+export async function getAmount(account: HardhatEthersSigner, token: string, ethers: typeof e, wnative: string) {
+  const isNative = token === wnative;
+  const tokenContract = await ethers.getContractAt("ERC20", token);
+  const balance = await (isNative ? ethers.provider.getBalance(account) : tokenContract.balanceOf(account));
+  return BigInt(Math.floor(Math.random() * +balance.toString())) / 10_000n;
 }

@@ -1,54 +1,48 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Router } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { randomNumber } from "../../utilities";
+import { getAmount, getSwapTokens, randomNumber } from "../../utilities";
 
 export default async function swap(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("Swapping");
-
   const { ethers } = hre;
   const { deployer } = await hre.getNamedAccounts();
-
   const router = await ethers.getContract<Router>("Router", deployer);
   const wnative = await router.getWrappedNativeToken();
-  const paths = await Promise.all(
-    (await router.pairs()).map(async address => {
-      const pair = await ethers.getContractAt("Pair", address);
-      const token0 = await pair.token0();
-      const token1 = await pair.token1();
 
-      return wnative == token1 ? [token0, token1] : [token1, token0];
+  const { swapTokens, swapTokenPath } = await getSwapTokens(router, ethers);
+
+  if (swapTokens.length < 2) return;
+  const [inToken, outToken] = [
+    swapTokens.splice(randomNumber(0, swapTokens.length - 1), 1)[0],
+    swapTokens.splice(randomNumber(0, swapTokens.length - 1), 1)[0],
+  ];
+
+  const swapPath = swapTokenPath[inToken + outToken] ?? [inToken, ...swapTokens, outToken];
+  if (swapPath.length < 2) return;
+
+  await Promise.all(
+    accounts.map(async tester => {
+      const amountIn = await getAmount(tester, swapPath[0], ethers, wnative);
+      console.log("Swapping", { tester: tester.address, amountIn: ethers.formatEther(amountIn) });
+
+      if (swapPath[0] !== wnative) {
+        const token0 = await ethers.getContractAt("ERC20", swapPath[0]);
+        await token0.connect(tester).approve(router, amountIn);
+      }
+
+      const args = [amountIn, 1, swapPath, tester.address, Number.MAX_SAFE_INTEGER] as const;
+      const RouterLib = require("../../verification/libs/localhost/Router.js");
+      const RouterFactory = await ethers.getContractFactory("Router", { libraries: RouterLib });
+      const referrerId = randomNumber(0, +(await router.totalUsers()).toString());
+
+      await router
+        .connect(tester)
+        .registerAndSwap(
+          referrerId,
+          RouterFactory.interface.encodeFunctionData(router.swapExactTokensForTokens.name, args),
+          { value: swapPath[0] === wnative ? amountIn : 0 },
+        );
     }),
   );
-
-  const swapPath = paths.find(path => path.includes(wnative));
-  swapPath?.length &&
-    (await Promise.all(
-      accounts.map(async tester => {
-        const token0 = await ethers.getContractAt("ERC20", swapPath[0]);
-
-        let amountIn = ethers.parseEther(randomNumber(0.005, 50).toFixed(+(await token0.decimals()).toString()));
-        // Acquire ERc20 token
-        await router
-          .connect(tester)
-          .swapExactTokensForTokens(amountIn, 1, swapPath.slice().reverse(), tester.address, Number.MAX_SAFE_INTEGER, {
-            value: amountIn,
-          });
-        amountIn = await token0.balanceOf(tester.address);
-        console.log("Swapping", { tester: tester.address, amountIn: ethers.formatEther(amountIn) });
-
-        await token0.connect(tester).approve(router, amountIn);
-
-        const args = [amountIn, 1, swapPath, tester.address, Number.MAX_SAFE_INTEGER] as const;
-        const RouterLib = require("../../verification/libs/localhost/Router.js");
-        const RouterFactory = await ethers.getContractFactory("Router", { libraries: RouterLib });
-        const referrerId = Math.floor(Math.random() * +(await router.totalUsers()).toString());
-        await router
-          .connect(tester)
-          .registerAndSwap(
-            referrerId,
-            RouterFactory.interface.encodeFunctionData(router.swapExactTokensForTokens.name, args),
-          );
-      }),
-    ));
 }

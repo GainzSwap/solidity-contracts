@@ -1,41 +1,43 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { Gainz, Router } from "../../typechain-types";
-import { randomNumber } from "../../utilities";
+import { Router } from "../../typechain-types";
+import { getAmount, getSwapTokens, randomNumber } from "../../utilities";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import vote from "./vote";
 
 export default async function stake(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nStaking");
-
   const { ethers } = hre;
   const { deployer } = await hre.getNamedAccounts();
-
   const router = await ethers.getContract<Router>("Router", deployer);
+  const governance = await ethers.getContractAt("Governance", await router.getGovernance());
   const wnative = await router.getWrappedNativeToken();
 
-  const gainz = await ethers.getContract<Gainz>("Gainz", deployer);
-  const gainzAddress = await gainz.getAddress();
-
-  const governance = await ethers.getContractAt("Governance", await router.getGovernance());
+  const { swapTokens } = await getSwapTokens(router, ethers);
 
   for (const account of accounts) {
-    const amount = await ethers.provider.getBalance(account.address).then(bal => {
-      const randBal = Math.floor(Math.random() * +bal.toString());
-      return BigInt(randBal) / 10_000n;
-    });
+    if (swapTokens.length < 2) continue;
+    const [tokenA, tokenB] = [
+      swapTokens.splice(randomNumber(0, swapTokens.length - 1), 1)[0],
+      swapTokens.splice(randomNumber(0, swapTokens.length - 1), 1)[0],
+    ];
 
+    const amount = await getAmount(account, tokenA, ethers, wnative);
     console.log(`Staking ${ethers.formatEther(amount)}`);
+
+    if (tokenA !== wnative) {
+      const token0 = await ethers.getContractAt("ERC20", tokenA);
+      await token0.connect(account).approve(governance, amount);
+    }
 
     try {
       await governance
         .connect(account)
         .stake(
-          { amount, token: wnative, nonce: 0 },
-          randomNumber(180, 1080),
-          [[wnative], [wnative, gainzAddress], []],
+          { amount, token: tokenA, nonce: 0 },
+          randomNumber(0, 1080),
+          [[tokenA], [tokenA, tokenB], tokenA === wnative ? [] : [tokenA, wnative]],
           1n,
           1n,
-          { value: amount },
+          { value: tokenA === wnative ? amount : 0 },
         );
     } catch (error) {
       console.error(error);
