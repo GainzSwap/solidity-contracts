@@ -14,7 +14,8 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 
 	function setUp() public {
 		governance = Governance(payable(router.getGovernance()));
-		wNative = dEDU(payable(router.getWrappedNativeToken()));
+		wNative.setYuzuAggregator(address(899999));
+
 
 		TokenPayment memory paymentA = TokenPayment({
 			nonce: 0,

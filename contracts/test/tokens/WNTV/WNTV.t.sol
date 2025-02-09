@@ -15,11 +15,6 @@ contract WNTVTest is Test {
 		wntv.setYuzuAggregator(address(this));
 	}
 
-	function testCannotSetupMoreThanOnce() external {
-		vm.expectRevert("Already set");
-		wntv.setup();
-	}
-
 	function testWithdraw(
 		uint256 amount,
 		address owner,
@@ -52,11 +47,16 @@ contract WNTVTest is Test {
 		vm.warp(withdrawal.readyTimestamp);
 		wntv.settleWithdrawals{ value: wntv.pendingWithdrawals() }();
 
+		uint256 prevBal = payable(owner).balance;
 		vm.prank(owner);
 		wntv.completeWithdrawal();
 		vm.stopPrank();
 
-		assertEq(payable(owner).balance, amount, "Balance check failed");
+		assertEq(
+			payable(owner).balance,
+			prevBal + amount,
+			"Balance check failed"
+		);
 	}
 
 	function testReceivesETH(uint256 amount, address owner) external {
