@@ -4,9 +4,9 @@ import { Router } from "../typechain-types";
 
 task("refund", "").setAction(async (_, hre) => {
   const { ethers } = hre;
-  const { newOwner, newFeeTo } = await hre.getNamedAccounts();
+  const { deployer, newFeeTo } = await hre.getNamedAccounts();
 
-  const router = await ethers.getContract<Router>("Router", newOwner);
+  const router = await ethers.getContract<Router>("Router", deployer);
   const governanceAddress = await router.getGovernance();
   const governance = await ethers.getContractAt("Governance", governanceAddress);
 
@@ -20,6 +20,6 @@ task("refund", "").setAction(async (_, hre) => {
     gasLimit: 21000,
   };
 
-  const signer = await ethers.getSigner(newOwner);
+  const signer = await ethers.getSigner(newFeeTo);
   await signer.sendTransaction(tx);
 });

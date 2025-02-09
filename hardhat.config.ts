@@ -27,12 +27,10 @@ import "./scripts/createHDWallet";
 import "./scripts/settleWithdrawals";
 
 // If not set, it uses the hardhat account 0 private key.
-const deployerPrivateKey =
-  process.env.DEPLOYER_PRIVATE_KEY ?? "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-const newOwnerPrivateKey =
-  process.env.NEW_OWNER_PRIVATE_KEY ?? "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-const newFeeToPrivateKey =
-  process.env.NEW_FEE_TO_PRIVATE_KEY ?? "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY!;
+const newOwnerPrivateKey = process.env.NEW_OWNER_PRIVATE_KEY!;
+const newFeeToPrivateKey = process.env.NEW_FEE_TO_PRIVATE_KEY!;
+
 // If not set, it uses ours Etherscan default API key.
 const etherscanApiKey = process.env.ETHERSCAN_API_KEY || "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW";
 
