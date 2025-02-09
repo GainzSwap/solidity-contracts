@@ -165,16 +165,15 @@ library GovernanceLib {
 				token1
 			)
 		).approve($.router, liquidityToReturn);
-		Router(payable($.router))
-			.removeLiquidity(
-				token0,
-				token1,
-				liquidityToReturn,
-				amount0Min,
-				amount1Min,
-				user,
-				block.timestamp + 1
-			);
+		Router(payable($.router)).removeLiquidity(
+			token0,
+			token1,
+			liquidityToReturn,
+			amount0Min,
+			amount1Min,
+			user,
+			block.timestamp + 1
+		);
 	}
 
 	function proposeNewPairListing(
@@ -469,7 +468,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			// Compute the liquidity value
 			liqInfo.liqValue = payment.token == $.wNativeToken
 				? msg.value
-				: _computeLiqValue($, paymentA, paymentB, paths[2]);
+				: _computeLiqValue($, paymentA, paymentB, paths[2]) * 2;
 		}
 
 		// Mint GToken tokens for the user
