@@ -1,8 +1,6 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { Gainz, Router } from "../../typechain-types";
-import { randomNumber } from "../../utilities";
+import { Router } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import vote from "./vote";
 
 export default async function delegate(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nDelegating");
