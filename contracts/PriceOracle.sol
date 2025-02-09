@@ -16,7 +16,7 @@ import "./types.sol";
 contract PriceOracle {
 	using FixedPoint for *;
 
-	uint public constant PERIOD = 60 minutes;
+	uint public constant PERIOD = 24 hours;
 
 	address public immutable router;
 	address public immutable pairsBeacon;
