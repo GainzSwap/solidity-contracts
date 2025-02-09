@@ -159,7 +159,6 @@ library RouterLib {
 		address to,
 		address _originalCaller,
 		address wNtvAddr,
-		address governance,
 		address pairsBeacon
 	) external returns (uint[2][] memory amounts) {
 		amounts = AMMLibrary.getAmountsOut(
@@ -200,14 +199,7 @@ library RouterLib {
 			}
 		}
 
-		// Swap and prepare to unWrap Native if needed
-		bool autoUnwrap = to != governance && path[path.length - 1] == wNtvAddr;
-		_swap(amounts, path, autoUnwrap ? address(this) : to, pairsBeacon);
-		// if (autoUnwrap)
-		// 	path[path.length - 1].sendFungibleToken(
-		// 		amounts[path.length - 1][0],
-		// 		to
-		// 	);
+		_swap(amounts, path, to, pairsBeacon);
 	}
 }
 
@@ -413,7 +405,6 @@ contract Router is
 				to,
 				_originalCaller,
 				getWrappedNativeToken(),
-				_getRouterStorage().governance,
 				getPairsBeacon()
 			);
 	}
