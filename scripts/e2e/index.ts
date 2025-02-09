@@ -2,8 +2,7 @@ import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import swap from "./swap";
 import stake from "./stake";
-import { randomNumber, sleep } from "../../utilities";
-import axios from "axios";
+import { randomNumber } from "../../utilities";
 import fundCampaign from "./fundCampaign";
 import claimRewards from "./claimRewards";
 import delegate from "./delegate";
@@ -13,7 +12,7 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { minutes } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 
 task("e2e", "").setAction(async (_, hre) => {
-  const actions = [transferWNTV, delegate, unDelegate, fundCampaign];
+  const actions = [claimRewards, stake, swap, transferWNTV, delegate, unDelegate, fundCampaign];
   const accounts = await hre.ethers.getSigners();
 
   while (true) {
