@@ -268,7 +268,7 @@ contract Router is
 		);
 
 		// set Delegated EDU;
-		$.wNativeToken = DeployWNTV.create($.proxyAdmin);
+		$.wNativeToken = DeployWNTV.create($.proxyAdmin, initialOwner);
 		$.governance = DeployGovernance.create(
 			$.epochs,
 			gainzToken,

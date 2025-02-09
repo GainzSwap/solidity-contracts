@@ -6,13 +6,16 @@ import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/trans
 import { WNTV } from "../tokens/WNTV.sol";
 
 library DeployWNTV {
-	function create(address proxyAdmin) external returns (address) {
+	function create(
+		address proxyAdmin,
+		address initialOwner
+	) external returns (address) {
 		return
 			address(
 				new TransparentUpgradeableProxy(
 					address(new WNTV()),
 					proxyAdmin,
-					abi.encodeWithSignature("initialize()")
+					abi.encodeWithSignature("initialize(address)", initialOwner)
 				)
 			);
 	}

@@ -56,7 +56,7 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 	constructor(WNTV _weth) {
 		weth = _weth;
 
-		weth.initialize();
+		weth.initialize(address(this));
 		weth.setup();
 		weth.setYuzuAggregator(yuzuAggregator);
 

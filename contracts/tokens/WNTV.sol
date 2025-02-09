@@ -46,9 +46,9 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 	}
 
 	/// @notice Initializes the contract and sets token metadata.
-	function initialize() public initializer {
+	function initialize(address initialOwner) public initializer {
 		__ERC20_init("Delegated EDU", "dEDU");
-		__Ownable_init(msg.sender);
+		__Ownable_init(initialOwner);
 	}
 
 	/// @notice Sets the contract owner after deployment.

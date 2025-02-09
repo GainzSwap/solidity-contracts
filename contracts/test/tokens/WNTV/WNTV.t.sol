@@ -10,7 +10,7 @@ contract WNTVTest is Test {
 
 	function setUp() external {
 		wntv = new WNTV();
-		wntv.initialize();
+		wntv.initialize(address(this));
 		wntv.setup();
 		wntv.setYuzuAggregator(address(this));
 	}
