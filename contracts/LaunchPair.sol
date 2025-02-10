@@ -284,7 +284,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 			$.userCampaigns[msg.sender].add(_campaignId);
 		}
 
-		if (referrerId > 0) router.register(msg.sender, referrerId);
+		router.register(msg.sender, referrerId);
 
 		emit ContributionMade(_campaignId, msg.sender, weiAmount);
 	}
