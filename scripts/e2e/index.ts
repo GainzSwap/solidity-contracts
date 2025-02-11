@@ -35,9 +35,9 @@ task("e2e", "").setAction(async (_, hre) => {
 
           console.log(error);
         }
-
-        await time.increase(minutes(randomNumber(5, 50)));
       }),
     );
+
+    await time.increase(minutes(randomNumber(5, 50)));
   }
 });
