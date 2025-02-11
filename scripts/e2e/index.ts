@@ -18,8 +18,8 @@ task("e2e", "").setAction(async (_, hre) => {
   while (true) {
     await Promise.all(
       actions.map(async action => {
-        const accountStart = randomNumber(4, accounts.length / 2);
-        const accountEnd = randomNumber(accountStart + 1, accounts.length);
+        const accountStart = randomNumber(4, accounts.length - 1);
+        const accountEnd = randomNumber(accountStart + 1, accountStart + 30);
         const selectedAccounts = accounts.slice(accountStart, accountEnd);
 
         try {
