@@ -631,7 +631,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		uint256 gTokenNonce = GToken($.gtoken).mintGToken(
 			address(this),
 			$.rewardPerShare,
-			0,
+			60,
 			LiquidityInfo({
 				pair: pair,
 				liquidity: liquidity,
