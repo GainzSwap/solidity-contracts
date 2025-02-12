@@ -4,6 +4,14 @@ pragma solidity ^0.8.28;
 import { TokenPayment } from "../libraries/TokenPayments.sol";
 
 interface IRouter {
+	event Swap(
+		address indexed receiver,
+		address indexed tokenIn,
+		address indexed tokenOut,
+		uint256 amountOut,
+		uint256 feeAmountOut
+	);
+
 	function createPair(
 		TokenPayment calldata paymentA,
 		TokenPayment calldata paymentB

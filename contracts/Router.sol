@@ -68,6 +68,14 @@ library RouterLib {
 			IPair(AMMLibrary.pairFor(address(this), pairsBeacon, input, output))
 				.swap(amount0Out, feeAmount0, amount1Out, feeAmount1, to);
 		}
+
+		emit IRouter.Swap(
+			_to,
+			path[0],
+			path[path.length - 1],
+			amounts[amounts.length - 1][0],
+			amounts[amounts.length - 1][1]
+		);
 	}
 
 	function _addLiquidity(
