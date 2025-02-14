@@ -370,10 +370,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		TokenPayment memory paymentB,
 		address[] calldata pathToNative
 	) internal returns (uint256 value) {
-		// Early return if either payment{A,B} is native
-		if (paymentA.token == $.wNativeToken) return paymentA.amount;
-		if (paymentB.token == $.wNativeToken) return paymentB.amount;
-
 		// Validate the pathToNative
 		if (
 			pathToNative.length < 2 || // `pathToNative` must have valid length
@@ -460,9 +456,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 				.addLiquidity(paymentA, paymentB, 0, 0, block.timestamp + 1);
 
 			// Compute the liquidity value
-			liqInfo.liqValue = payment.token == $.wNativeToken
-				? msg.value
-				: _computeLiqValue($, paymentA, paymentB, paths[2]) * 2;
+			liqInfo.liqValue = _computeLiqValue($, paymentA, paymentB, paths[2]) * 2;
 		}
 
 		// Mint GToken tokens for the user
