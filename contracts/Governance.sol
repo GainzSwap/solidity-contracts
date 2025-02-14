@@ -30,7 +30,7 @@ import { LaunchPair } from "./LaunchPair.sol";
 import "./types.sol";
 import "./errors.sol";
 
-uint256 constant MIN_LIQ_VALUE_FOR_LISTING = 25_000e18;
+uint256 constant MIN_LIQ_VALUE_FOR_LISTING = 5_000e18;
 
 library GovernanceLib {
 	using Epochs for Epochs.Storage;
