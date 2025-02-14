@@ -92,6 +92,14 @@ contract GToken is SFT {
 		return _mint(to, attributes.supply(), abi.encode(attributes));
 	}
 
+	function burn(
+		address user,
+		uint256 nonce,
+		uint256 supply
+	) external canUpdate {
+		_burn(user, nonce, supply);
+	}
+
 	function update(
 		address user,
 		uint256 nonce,

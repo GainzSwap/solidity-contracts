@@ -132,29 +132,22 @@ library GovernanceLib {
 			user,
 			nonce
 		);
+
+		GToken($.gtoken).burn(user, nonce, attributes.supply());
+
 		uint256 liquidity = attributes.lpDetails.liquidity;
 		uint256 liquidityToReturn = attributes.epochsLocked == 0
 			? liquidity
 			: attributes.valueToKeep(liquidity, $.epochs.currentEpoch());
 		if (liquidityToReturn < liquidity) {
-			// TODO we should have an account that collects this at interval from Governace and keeps the liquidity forever.
-			// address feeTo = Router(payable($.router)).feeTo();
-			// require(
-			// 	feeTo != address(0) && feeTo != address(this),
-			// 	"Governance: INVALID_FEE_TO_ADDRESS"
-			// );
-
-			// pair.transfer(feeTo, liquidity - liquidityToReturn);
+			$.pairLiqFee[attributes.lpDetails.pair] +=
+				liquidity -
+				liquidityToReturn;
 
 			// Adjust slippage accordingly
 			amount0Min = (amount0Min * liquidityToReturn) / liquidity;
 			amount1Min = (amount1Min * liquidityToReturn) / liquidity;
 		}
-
-		// Set these values to 0 and updating the atttributes at nonce effectively burns the token
-		attributes.lpDetails.liquidity = 0;
-		attributes.lpDetails.liqValue = 0;
-		nonce = GToken($.gtoken).update(user, nonce, attributes);
 
 		address token0 = attributes.lpDetails.token0;
 		address token1 = attributes.lpDetails.token1;
@@ -286,6 +279,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		EnumerableSet.AddressSet pendingOrListedTokens;
 		mapping(address => TokenListing) pairOwnerListing;
 		LaunchPair launchPair;
+		mapping(address => uint) pairLiqFee;
 	}
 
 	// keccak256(abi.encode(uint256(keccak256("gainz.Governance.storage")) - 1)) & ~bytes32(uint256(0xff));

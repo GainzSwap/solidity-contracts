@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { Test } from "forge-std/Test.sol";
-import { Governance } from "../Governance.sol";
+import { Governance, GTokenLib, Epochs } from "../Governance.sol";
 import { Router } from "../Router.sol";
 import { TokenPayment, TokenPayments } from "../libraries/TokenPayments.sol";
 import { Epochs } from "../libraries/Epochs.sol";
@@ -14,6 +14,7 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 
 	function setUp() public {
 		governance = Governance(payable(router.getGovernance()));
+
 		wNative.setYuzuAggregator(address(899999));
 
 
@@ -37,10 +38,11 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 		router.createPair(paymentA, paymentB);
 	}
 
-	function testFuzz_stake(uint256 amount) public {
+	function testFuzz_stake(uint256 amount, uint256 epochsLocked) public {
 		vm.assume(
 			1e-15 ether <= amount && amount <= gainz.balanceOf(address(this))
 		);
+		epochsLocked=bound(epochsLocked,GTokenLib.MIN_EPOCHS_LOCK, GTokenLib.MAX_EPOCHS_LOCK);
 
 		TokenPayment memory payment = TokenPayment({
 			nonce: 0,
@@ -64,6 +66,7 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 
 		gainz.approve(address(governance), amount);
 
-		governance.stake(payment, 1080, paths, amountOutMinA, amountOutMinB);
+		governance.stake(payment, epochsLocked, paths, amountOutMinA, amountOutMinB);
+		governance.unStake(1,1,1);
 	}
 }
