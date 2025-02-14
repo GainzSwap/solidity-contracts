@@ -30,6 +30,13 @@ contract PriceOracle {
 	mapping(address => FixedPoint.uq112x112) public price0Average;
 	mapping(address => FixedPoint.uq112x112) public price1Average;
 
+	event Update(
+		address indexed pair,
+		uint256 price0Cumulative,
+		uint256 price1Cumulative,
+		uint256 blockTimestamp
+	);
+
 	constructor() {
 		router = msg.sender;
 		pairsBeacon = IRouter(router).getPairsBeacon();
@@ -37,6 +44,10 @@ contract PriceOracle {
 
 	function add(address tokenA, address tokenB) external {
 		address pair = pairFor(tokenA, tokenB);
+		addPair(pair);
+	}
+
+	function addPair(address pair) public {
 		IPair _pair = IPair(pair);
 
 		token0[pair] = _pair.token0();
@@ -47,6 +58,13 @@ contract PriceOracle {
 		uint112 reserve1;
 		(reserve0, reserve1, blockTimestampLast[pair]) = _pair.getReserves();
 		require(reserve0 != 0 && reserve1 != 0, "PriceOracle: NO_RESERVES"); // ensure that there's liquidity in the pair
+
+		emit Update(
+			pair,
+			price0CumulativeLast[pair],
+			price1CumulativeLast[pair],
+			blockTimestampLast[pair]
+		);
 	}
 
 	function pairFor(
@@ -87,6 +105,8 @@ contract PriceOracle {
 		price0CumulativeLast[pair] = price0Cumulative;
 		price1CumulativeLast[pair] = price1Cumulative;
 		blockTimestampLast[pair] = blockTimestamp;
+
+		emit Update(pair, price0Cumulative, price1Cumulative, blockTimestamp);
 	}
 
 	// note this will always return 0 before update has been called successfully for the first time.
