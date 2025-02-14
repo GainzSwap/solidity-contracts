@@ -21,8 +21,8 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 	uint constant MINIMUM_LIQUIDITY = 10 ** 3;
 
 	uint constant FEE_BASIS_POINTS = 100_00; // 100%
-	uint constant MINIMUM_FEE = 30; // 0.3%
-	uint constant MAXIMUM_FEE = 250; // 2.5%
+	uint constant MINIMUM_FEE = 5; // 0.05%
+	uint constant MAXIMUM_FEE = 65; // 0.65%
 
 	bytes4 private constant SELECTOR =
 		bytes4(keccak256(bytes("transfer(address,uint256)")));
