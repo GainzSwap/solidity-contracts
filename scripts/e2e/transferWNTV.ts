@@ -24,7 +24,7 @@ export default async function transferWNTV(hre: HardhatRuntimeEnvironment, accou
     const accounts = await hre.getUnnamedAccounts();
 
     try {
-      await wnative.connect(account).transfer(accounts[randomNumber(0, accounts.length - 1)], amount);
+      await wnative.connect(account).transfer(accounts[randomNumber(0, accounts.length)], amount);
     } catch (error) {
       console.error(error);
     }

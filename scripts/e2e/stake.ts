@@ -2,6 +2,8 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Router } from "../../typechain-types";
 import { getAmount, getSwapTokens, randomNumber } from "../../utilities";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { hours } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 
 export default async function stake(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nStaking");
@@ -16,9 +18,11 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
   for (const account of accounts) {
     if (swapTokens.length < 2) continue;
     const [tokenA, tokenB] = [
-      swapTokens.splice(randomNumber(0, swapTokens.length - 1), 1)[0],
-      swapTokens.splice(randomNumber(0, swapTokens.length - 1), 1)[0],
+      swapTokens.splice(randomNumber(0, swapTokens.length), 1)[0],
+      swapTokens.splice(randomNumber(0, swapTokens.length), 1)[0],
     ];
+
+    console.log({ tokenA, tokenB, wnative });
 
     const amount = await getAmount(account, tokenA, ethers, wnative);
     console.log(`Staking ${ethers.formatEther(amount)}`);
@@ -33,7 +37,7 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
         .connect(account)
         .stake(
           { amount, token: tokenA, nonce: 0 },
-          randomNumber(0, 1080),
+          randomNumber(0, 1081),
           [[tokenA], [tokenA, tokenB], tokenA === wnative ? [] : [tokenA, wnative]],
           1n,
           1n,

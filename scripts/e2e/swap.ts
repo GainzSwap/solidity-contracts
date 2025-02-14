@@ -14,8 +14,8 @@ export default async function swap(hre: HardhatRuntimeEnvironment, accounts: Har
 
   if (swapTokens.length < 2) return;
   const [inToken, outToken] = [
-    swapTokens.splice(randomNumber(0, swapTokens.length - 1), 1)[0],
-    swapTokens.splice(randomNumber(0, swapTokens.length - 1), 1)[0],
+    swapTokens.splice(randomNumber(0, swapTokens.length), 1)[0],
+    swapTokens.splice(randomNumber(0, swapTokens.length), 1)[0],
   ];
 
   const swapPath = swapTokenPath[inToken + outToken] ?? [inToken, ...swapTokens, outToken];
