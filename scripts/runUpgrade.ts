@@ -1,8 +1,8 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { Gainz, Router } from "../typechain-types";
-import { getGovernanceLibraries, getRouterLibraries, sleep } from "../utilities";
-import { getCreate2Address, keccak256, solidityPackedKeccak256, ZeroAddress } from "ethers";
+import { computePriceOracleAddr, getGovernanceLibraries, getRouterLibraries, sleep } from "../utilities";
+import { ZeroAddress } from "ethers";
 
 task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   const { deployer } = await hre.getNamedAccounts();
@@ -126,12 +126,8 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   console.log("Pair beacon upgraded successfully.");
 
   console.log("\nSaving artifacts");
-  const PriceOralcleBuild = require("../artifacts/contracts/PriceOracle.sol/PriceOracle.json");
-  const oracleAddr = getCreate2Address(
-    routerAddress,
-    solidityPackedKeccak256(["address"], [routerAddress]),
-    keccak256(PriceOralcleBuild.bytecode),
-  );
+
+  const oracleAddr = computePriceOracleAddr(routerAddress);
   const priceOracle = await hre.ethers.getContractAt("PriceOracle", oracleAddr);
 
   console.log("Adding Pairs to Oracle");

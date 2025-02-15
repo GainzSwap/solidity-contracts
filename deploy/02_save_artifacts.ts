@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { ZeroAddress } from "ethers";
 import { Router } from "../typechain-types/contracts/Router.sol";
+import { computePriceOracleAddr } from "../utilities";
 
 const deployPairs: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Done to have the abi in front end
@@ -10,14 +11,6 @@ const deployPairs: DeployFunction = async function (hre: HardhatRuntimeEnvironme
 
   const router = await ethers.getContract<Router>("Router", deployer);
   const wNativeToken = await router.getWrappedNativeToken();
-  // const priceOracle = await ethers.getContractAt(
-  //   "PriceOracle",
-  //   getCreate2Address(
-  //     routerAddress,
-  //     solidityPackedKeccak256(["address"], [routerAddress]),
-  //     keccak256(PriceOralcleBuild.bytecode),
-  //   ),
-  // );
 
   const { save, getExtendedArtifact } = hre.deployments;
 
@@ -31,6 +24,7 @@ const deployPairs: DeployFunction = async function (hre: HardhatRuntimeEnvironme
     ["GToken", gTokenAddr],
     ["WNTV", wNativeToken],
     ["LaunchPair", await governance.launchPair()],
+    ["PriceOracle", computePriceOracleAddr(await router.getAddress())],
   ];
 
   for (const [contract, address] of artifactsToSave) {

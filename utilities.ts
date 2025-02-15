@@ -96,6 +96,7 @@ async function saveLibraries(libraries: Record<string, string>, contractName: st
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Router } from "./typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { getCreate2Address, keccak256, solidityPackedKeccak256 } from "ethers";
 
 export async function getDeploymentTxHashFromNetwork(
   hre: HardhatRuntimeEnvironment,
@@ -175,4 +176,13 @@ export async function getAmount(account: HardhatEthersSigner, token: string, eth
   const tokenContract = await ethers.getContractAt("ERC20", token);
   const balance = await (isNative ? ethers.provider.getBalance(account) : tokenContract.balanceOf(account));
   return BigInt(Math.floor(Math.random() * +balance.toString())) / 10_000n;
+}
+
+export function computePriceOracleAddr(routerAddress: string) {
+  const PriceOralcleBuild = require("./artifacts/contracts/PriceOracle.sol/PriceOracle.json");
+  return getCreate2Address(
+    routerAddress,
+    solidityPackedKeccak256(["address"], [routerAddress]),
+    keccak256(PriceOralcleBuild.bytecode),
+  );
 }
