@@ -66,6 +66,7 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 
 		gainz.approve(address(governance), amount);
 
+vm.warp(block.timestamp+20 minutes);
 		governance.stake(payment, epochsLocked, paths, amountOutMinA, amountOutMinB);
 		governance.unStake(1,1,1);
 	}

@@ -144,6 +144,7 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
     ["LaunchPair", launchPairAddress],
     ["Pair", ZeroAddress],
     ["PriceOracle", oracleAddr],
+    ["Governance", govAddress],
   ]) {
     const { abi, metadata } = await hre.deployments.getExtendedArtifact(contract);
     await hre.deployments.save(contract, { abi, metadata, address });
