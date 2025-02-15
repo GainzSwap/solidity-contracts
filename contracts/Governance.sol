@@ -349,21 +349,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 				)[path.length - 1][0];
 	}
 
-	function _receiveAndApprovePayment(
-		TokenPayment memory payment,
-		address router
-	) internal returns (address wNativeToken) {
-		wNativeToken = Router(payable(router)).getWrappedNativeToken();
-		bool paymentIsNative = payment.token == wNativeToken;
-
-		if (paymentIsNative) payment.token = address(0);
-		payment.receiveTokenFor(msg.sender, address(this), wNativeToken);
-		if (paymentIsNative) payment.token = wNativeToken;
-
-		// Optimistically approve `router` to spend payment in `_getDesiredToken` call
-		payment.approve(router);
-	}
-
 	function _computeLiqValue(
 		GovernanceStorage storage $,
 		TokenPayment memory paymentA,
@@ -404,6 +389,21 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		require(value > 0, "Governance: INVALID_COMPUTED_LIQ_VALUE");
 	}
 
+	function _receiveAndApprovePayment(
+		TokenPayment memory payment,
+		address router,
+		address wNativeToken
+	) internal  {
+		bool paymentIsNative = msg.value > 0;
+
+		if (paymentIsNative) payment.token = address(0);
+		payment.receiveTokenFor(msg.sender, address(this), wNativeToken);
+		if (paymentIsNative) payment.token = wNativeToken;
+
+		// Optimistically approve `router` to spend payment in `_getDesiredToken` call
+		payment.approve(router);
+	}
+
 	function stake(
 		TokenPayment calldata payment,
 		uint256 epochsLocked,
@@ -424,7 +424,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		LiquidityInfo memory liqInfo;
 		{
 			// Receive and approve the payment
-			_receiveAndApprovePayment(payment, $.router);
+			_receiveAndApprovePayment(payment, $.router, $.wNativeToken);
 
 			// Swap the payment tokens into the desired tokens
 			TokenPayment memory paymentA = _getDesiredToken(
@@ -456,7 +456,9 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 				.addLiquidity(paymentA, paymentB, 0, 0, block.timestamp + 1);
 
 			// Compute the liquidity value
-			liqInfo.liqValue = _computeLiqValue($, paymentA, paymentB, paths[2]) * 2;
+			liqInfo.liqValue =
+				_computeLiqValue($, paymentA, paymentB, paths[2]) *
+				2;
 		}
 
 		// Mint GToken tokens for the user

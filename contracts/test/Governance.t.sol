@@ -8,6 +8,7 @@ import { TokenPayment, TokenPayments } from "../libraries/TokenPayments.sol";
 import { Epochs } from "../libraries/Epochs.sol";
 import { ERC1155Holder } from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import { RouterFixture, Gainz, WNTV } from "./shared/RouterFixture.sol";
+import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 	Governance governance;
@@ -16,7 +17,6 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 		governance = Governance(payable(router.getGovernance()));
 
 		wNative.setYuzuAggregator(address(899999));
-
 
 		TokenPayment memory paymentA = TokenPayment({
 			nonce: 0,
@@ -33,21 +33,32 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 			address(this),
 			address(router)
 		);
+
 		gainz.approve(address(router), paymentA.amount);
 
 		router.createPair(paymentA, paymentB);
+		wNative.receiveFor{ value: 50 ether }(address(this));
 	}
 
-	function testFuzz_stake(uint256 amount, uint256 epochsLocked) public {
-		vm.assume(
-			1e-15 ether <= amount && amount <= gainz.balanceOf(address(this))
+	function testFuzz_stake(
+		uint256 amount,
+		uint256 epochsLocked,
+		bool stakeGainz
+	) public {
+		IERC20 stakeToken = IERC20(
+			stakeGainz ? address(gainz) : address(wNative)
 		);
-		epochsLocked=bound(epochsLocked,GTokenLib.MIN_EPOCHS_LOCK, GTokenLib.MAX_EPOCHS_LOCK);
+		vm.assume(1e-15 ether <= amount && amount <= stakeToken.balanceOf(address(this)));
+		epochsLocked = bound(
+			epochsLocked,
+			GTokenLib.MIN_EPOCHS_LOCK,
+			GTokenLib.MAX_EPOCHS_LOCK
+		);
 
 		TokenPayment memory payment = TokenPayment({
 			nonce: 0,
 			amount: amount,
-			token: address(gainz)
+			token: address(stakeToken)
 		});
 		address[][3] memory paths;
 		uint256 amountOutMinA = 1;
@@ -59,15 +70,24 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 
 		pathToNative[0] = pathB[0] = pathA[0] = payment.token;
 		pathToNative[1] = pathB[1] = address(wNative);
+		if (!stakeGainz) {
+			pathToNative[0] = pathB[1] = address(gainz);
+		}
 
 		paths[0] = pathA;
 		paths[1] = pathB;
 		paths[2] = pathToNative;
 
-		gainz.approve(address(governance), amount);
+		stakeToken.approve(address(governance), amount);
 
-vm.warp(block.timestamp+20 minutes);
-		governance.stake(payment, epochsLocked, paths, amountOutMinA, amountOutMinB);
-		governance.unStake(1,1,1);
+		vm.warp(block.timestamp + 20 minutes);
+		governance.stake(
+			payment,
+			epochsLocked,
+			paths,
+			amountOutMinA,
+			amountOutMinB
+		);
+		governance.unStake(1, 1, 1);
 	}
 }
