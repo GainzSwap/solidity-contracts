@@ -11,8 +11,10 @@ const deployRouterContract: DeployFunction = async function (hre: HardhatRuntime
   const gainzToken = await upgrades.deployProxy(Gainz);
   await gainzToken.waitForDeployment();
 
+  const { routerLibs, AMMLibrary } = await getRouterLibraries(ethers, await getGovernanceLibraries(ethers));
+
   const Router = await ethers.getContractFactory("Router", {
-    libraries: await getRouterLibraries(ethers, await getGovernanceLibraries(ethers)),
+    libraries: routerLibs,
   });
   const gainzAddress = await gainzToken.getAddress();
   const router = await upgrades.deployProxy(Router, [deployer, gainzAddress], {
@@ -27,7 +29,7 @@ const deployRouterContract: DeployFunction = async function (hre: HardhatRuntime
 
   const Views = await ethers.getContractFactory("Views", {
     libraries: {
-      AMMLibrary: await (await ethers.deployContract("AMMLibrary")).getAddress(),
+      AMMLibrary,
     },
   });
   const views = await Views.deploy(routerAddress, await router.getPairsBeacon());
