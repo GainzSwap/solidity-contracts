@@ -5,6 +5,8 @@ import { Router } from "../typechain-types";
 task("deployNewViews", "").setAction(async (_, hre) => {
   const { ethers } = hre;
 
+  await hre.run("compile");
+
   const { deployer } = await hre.getNamedAccounts();
   const router = await ethers.getContract<Router>("Router", deployer);
   const routerAddress = await router.getAddress();

@@ -11,6 +11,22 @@ contract Views {
 		pairsBeacon = _pairsBeacon;
 	}
 
+	function getQuote(
+		uint256 amountIn,
+		address[] memory path
+	) external view returns (uint256 amountOut) {
+		for (uint256 i = 0; i < path.length - 1; i++) {
+			(uint256 reserveIn, uint256 reserveOut, ) = AMMLibrary.getReserves(
+				router,
+				pairsBeacon,
+				path[i],
+				path[i + 1]
+			);
+
+			amountIn = amountOut = quote(amountIn, reserveIn, reserveOut);
+		}
+	}
+
 	// **** AMM LIBRARY FUNCTIONS ****
 	function quote(
 		uint amountA,
