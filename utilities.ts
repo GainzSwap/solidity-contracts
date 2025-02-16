@@ -37,8 +37,9 @@ export async function getRouterLibraries(
   };
 
   await saveLibraries(libs, "Router", ethers);
+  await saveLibraries({ AMMLibrary }, "AMMLibrary", ethers);
 
-  return libs;
+  return { routerLibs: libs, AMMLibrary };
 }
 
 import * as fs from "fs";

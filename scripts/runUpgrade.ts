@@ -1,26 +1,69 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
-import { Router } from "../typechain-types";
+import { Gainz, Router } from "../typechain-types";
+import { computePriceOracleAddr, getGovernanceLibraries, getRouterLibraries, sleep } from "../utilities";
+import { ZeroAddress } from "ethers";
 
 task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   const { deployer } = await hre.getNamedAccounts();
   const deployerSigner = await hre.ethers.getSigner(deployer);
 
   const router = await hre.ethers.getContract<Router>("Router", deployer);
+  const gainz = await hre.ethers.getContract<Gainz>("Gainz", deployer);
 
   const routerAddress = await router.getAddress();
+  const gainzAddress = await gainz.getAddress();
+  const pairBeaconAddress = await router.getPairsBeacon();
+  const wntvAddr = await router.getWrappedNativeToken();
+
+  const govAddress = await router.getGovernance();
+  const governance = await hre.ethers.getContractAt("Governance", govAddress);
+
+  const gTokenAddress = await governance.getGToken();
+  const launchPairAddress = await governance.launchPair();
 
   console.log("Starting Upgrades");
   await hre.run("compile");
 
-  const routerLibs = {
-    OracleLibrary: "0x89eC9Ca7F02F3D36d6DC62589A1045459e9599fE",
-    DeployWNTV: "0xeBA86b67Fa4D83Da5CA29346b4C67d181D44aAc5",
-    RouterLib: "0xa47da8897B719621CFfde6dE595453126d27832d",
-    UserModuleLib: "0x2CD52db3A408Ad4A37929681DdA5913b50865496",
-    DeployPriceOracle: "0x5b653246f1d172923c86e79F3BCa9088BD0a85CF",
-    DeployGovernance: "0x416AB872e4faA10e140E9e5F193eF441CF914751",
-  };
+  // Gainz
+  console.log("Upgrading Gainz");
+  await hre.upgrades.forceImport(
+    gainzAddress,
+    await hre.ethers.getContractFactory("Gainz", { signer: deployerSigner }),
+  );
+  const newGainz = await hre.upgrades.upgradeProxy(
+    gainzAddress,
+    await hre.ethers.getContractFactory("Gainz", { signer: deployerSigner }),
+    {
+      redeployImplementation: "always",
+    },
+  );
+  console.log("Gainz upgraded successfully.");
+
+  // WNTV
+  console.log("Upgrading WNTV");
+  await hre.upgrades.forceImport(wntvAddr, await hre.ethers.getContractFactory("WNTV", { signer: deployerSigner }));
+  const newWntv = await hre.upgrades.upgradeProxy(
+    wntvAddr,
+    await hre.ethers.getContractFactory("WNTV", { signer: deployerSigner }),
+    {
+      redeployImplementation: "always",
+    },
+  );
+  console.log("WNTV upgraded successfully.");
+
+  // Libraries
+  console.log("Deploying Libraries");
+  const govLibs = await getGovernanceLibraries(hre.ethers);
+  const { routerLibs, AMMLibrary } = await getRouterLibraries(hre.ethers, govLibs);
+
+  const Views = await hre.ethers.getContractFactory("Views", {
+    libraries: {
+      AMMLibrary,
+    },
+  });
+  const views = await Views.deploy(routerAddress, await router.getPairsBeacon());
+  await views.waitForDeployment();
 
   // Router
   console.log("Upgrading Router");
@@ -29,9 +72,89 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
     await hre.ethers.getContractFactory("Router", { libraries: routerLibs, signer: deployerSigner }),
     { redeployImplementation: "always", unsafeAllowLinkedLibraries: true },
   );
+  console.log("Setting PriceOracle");
+  try {
+    await newRouter.setPriceOracle();
+  } catch (error) {
+    console.log("failed to set price oracle", { error });
+  }
   console.log("Router upgraded successfully.");
 
-  for (const [contract, address] of [["Router", routerAddress]]) {
+  // Governance
+  console.log("Upgrading Governance");
+  await hre.upgrades.forceImport(
+    govAddress,
+    await hre.ethers.getContractFactory("Governance", { libraries: govLibs, signer: deployerSigner }),
+  );
+  await hre.upgrades.upgradeProxy(
+    govAddress,
+    await hre.ethers.getContractFactory("Governance", { libraries: govLibs, signer: deployerSigner }),
+    { redeployImplementation: "always", unsafeAllowLinkedLibraries: true },
+  );
+  console.log("Governance upgraded successfully.");
+
+  // GToken
+  console.log("Upgrading GToken");
+  await hre.upgrades.forceImport(
+    gTokenAddress,
+    await hre.ethers.getContractFactory("GToken", { signer: deployerSigner }),
+  );
+  await hre.upgrades.upgradeProxy(
+    gTokenAddress,
+    await hre.ethers.getContractFactory("GToken", { signer: deployerSigner }),
+    {
+      redeployImplementation: "always",
+    },
+  );
+  console.log("GToken upgraded successfully.");
+
+  console.log("Upgrading LaunchPair");
+  await hre.upgrades.forceImport(
+    launchPairAddress,
+    await hre.ethers.getContractFactory("LaunchPair", { signer: deployerSigner }),
+  );
+  const newLaunchPair = await hre.upgrades.upgradeProxy(
+    launchPairAddress,
+    await hre.ethers.getContractFactory("LaunchPair", { signer: deployerSigner }),
+    {
+      redeployImplementation: "always",
+    },
+  );
+  console.log("LaunchPair upgraded successfully.");
+
+  // Get contract factories for the new implementations
+  const pairFactory = async () => hre.ethers.getContractFactory("Pair", { signer: deployerSigner });
+  console.log("Force importing Pair beacon...");
+  const pairBeacon = await hre.upgrades.forceImport(pairBeaconAddress, await pairFactory());
+  // Upgrade the Beacon with the new implementation of Pair
+  console.log("Upgrading Pair beacon...");
+  await hre.upgrades.upgradeBeacon(pairBeacon, await pairFactory(), { redeployImplementation: "always" });
+  console.log("Pair beacon upgraded successfully.");
+
+  console.log("\nSaving artifacts");
+
+  const oracleAddr = computePriceOracleAddr(routerAddress);
+  const priceOracle = await hre.ethers.getContractAt("PriceOracle", oracleAddr);
+
+  console.log("Adding Pairs to Oracle");
+  await sleep(5_000);
+  const pairs = await router.pairs();
+  for (const pair of pairs) {
+    await priceOracle.addPair(pair);
+    console.log("Added", { pair, oracleAddr });
+  }
+
+  for (const [contract, address] of [
+    ["Gainz", gainzAddress],
+    ["WNTV", wntvAddr],
+    ["Router", routerAddress],
+    ["GToken", gTokenAddress],
+    ["LaunchPair", launchPairAddress],
+    ["Pair", ZeroAddress],
+    ["PriceOracle", oracleAddr],
+    ["Governance", govAddress],
+    ["Views", await views.getAddress()],
+  ]) {
     const { abi, metadata } = await hre.deployments.getExtendedArtifact(contract);
     await hre.deployments.save(contract, { abi, metadata, address });
   }

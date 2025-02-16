@@ -48,6 +48,9 @@ contract PriceOracle {
 	}
 
 	function addPair(address pair) public {
+		// Prevent multiple additions
+		if (blockTimestampLast[pair] != 0) return;
+
 		IPair _pair = IPair(pair);
 
 		token0[pair] = _pair.token0();
