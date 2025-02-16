@@ -7,31 +7,31 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   const deployerSigner = await hre.ethers.getSigner(deployer);
 
   const router = await hre.ethers.getContract<Router>("Router", deployer);
-  const govAddress = await router.getGovernance();
+
+  const routerAddress = await router.getAddress();
 
   console.log("Starting Upgrades");
   await hre.run("compile");
 
-  const govLibs = {
-    DeployLaunchPair: "0x8fd0217f99B4B01315D799F6EDF6Bde80743B4bE",
-    GovernanceLib: "0x97c0CdB40fcA3ca8bfCea70236085Ed6B6b49C5F",
-    DeployGToken: "0xdeb422f287F0455Ea7228AA5a86F31BE387c025c",
+  const routerLibs = {
     OracleLibrary: "0x89eC9Ca7F02F3D36d6DC62589A1045459e9599fE",
+    DeployWNTV: "0xeBA86b67Fa4D83Da5CA29346b4C67d181D44aAc5",
+    RouterLib: "0xa47da8897B719621CFfde6dE595453126d27832d",
+    UserModuleLib: "0x2CD52db3A408Ad4A37929681DdA5913b50865496",
+    DeployPriceOracle: "0x5b653246f1d172923c86e79F3BCa9088BD0a85CF",
+    DeployGovernance: "0x416AB872e4faA10e140E9e5F193eF441CF914751",
   };
-  // Governance
-  console.log("Upgrading Governance");
-  await hre.upgrades.forceImport(
-    govAddress,
-    await hre.ethers.getContractFactory("Governance", { libraries: govLibs, signer: deployerSigner }),
-  );
-  await hre.upgrades.upgradeProxy(
-    govAddress,
-    await hre.ethers.getContractFactory("Governance", { libraries: govLibs, signer: deployerSigner }),
+
+  // Router
+  console.log("Upgrading Router");
+  const newRouter = await hre.upgrades.upgradeProxy(
+    routerAddress,
+    await hre.ethers.getContractFactory("Router", { libraries: routerLibs, signer: deployerSigner }),
     { redeployImplementation: "always", unsafeAllowLinkedLibraries: true },
   );
-  console.log("Governance upgraded successfully.");
+  console.log("Router upgraded successfully.");
 
-  for (const [contract, address] of [["Governance", govAddress]]) {
+  for (const [contract, address] of [["Router", routerAddress]]) {
     const { abi, metadata } = await hre.deployments.getExtendedArtifact(contract);
     await hre.deployments.save(contract, { abi, metadata, address });
   }

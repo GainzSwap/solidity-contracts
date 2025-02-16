@@ -110,7 +110,10 @@ library RouterLib {
 					reserveB,
 					reserveA
 				);
-				assert(amountAOptimal <= amountADesired);
+				require(
+					amountAOptimal <= amountADesired,
+					"Router: SLIPPAGE_EXCEEDED"
+				);
 				if (amountAOptimal < amountAMin)
 					revert Router.InSufficientAAmount();
 				(amountA, amountB) = (amountAOptimal, amountBDesired);
