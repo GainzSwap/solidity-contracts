@@ -330,23 +330,30 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 	function _getDesiredToken(
 		address[] calldata path,
 		TokenPayment calldata stakingPayment,
-		uint256 amountOutMin
+		uint256[2] calldata amounts, // [0]: amountIn, [1]: amountOutMin
+		uint256 deadline
 	) internal returns (TokenPayment memory payment) {
-		if (path.length == 0) revert InvalidPath(path);
+		uint256 amountIn = amounts[0];
+		uint256 amountOutMin = amounts[1];
 
-		uint256 amountIn = stakingPayment.amount / 2;
+		if (path.length < 2) {
+			payment = stakingPayment;
+			payment.amount = amountIn;
+
+			return payment;
+		}
+
+		if (payment.token == stakingPayment.token) revert InvalidPath(path);
 
 		payment.token = path[path.length - 1];
-		payment.amount = payment.token == stakingPayment.token
-			? amountIn
-			: Router(payable(_getGovernanceStorage().router))
-				.swapExactTokensForTokens(
-					amountIn,
-					amountOutMin,
-					path,
-					address(this),
-					block.timestamp + 1
-				)[path.length - 1][0];
+		payment.amount = Router(payable(_getGovernanceStorage().router))
+			.swapExactTokensForTokens(
+				amountIn,
+				amountOutMin,
+				path,
+				address(this),
+				deadline
+			)[path.length - 1][0];
 	}
 
 	function _computeLiqValue(
@@ -393,7 +400,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		TokenPayment memory payment,
 		address router,
 		address wNativeToken
-	) internal  {
+	) internal {
 		bool paymentIsNative = msg.value > 0;
 
 		if (paymentIsNative) payment.token = address(0);
@@ -408,8 +415,8 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		TokenPayment calldata payment,
 		uint256 epochsLocked,
 		address[][3] calldata paths, // 0 -> pathA, 1 -> pathB, 2 -> pathToNative
-		uint256 amountOutMinA,
-		uint256 amountOutMinB
+		uint256[2][2] calldata path_AB_amounts, // [0]: pathA_amounts, [1]: pathB_amounts
+		uint256 deadline
 	) external payable returns (uint256) {
 		// Validate the payment amount
 		if (
@@ -430,12 +437,14 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			TokenPayment memory paymentA = _getDesiredToken(
 				paths[0],
 				payment,
-				amountOutMinA
+				path_AB_amounts[0],
+				deadline
 			);
 			TokenPayment memory paymentB = _getDesiredToken(
 				paths[1],
 				payment,
-				amountOutMinB
+				path_AB_amounts[1],
+				deadline
 			);
 			require(
 				paymentA.token != paymentB.token,

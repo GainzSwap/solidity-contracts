@@ -15,7 +15,7 @@ interface IRouter {
 	function createPair(
 		TokenPayment calldata paymentA,
 		TokenPayment calldata paymentB
-	) external payable returns (address pairAddress, uint256 gTokenNonce);
+	) external payable returns (address pairAddress, uint256 liquidity);
 
 	function addLiquidity(
 		TokenPayment memory paymentA,

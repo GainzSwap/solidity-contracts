@@ -12,6 +12,7 @@ import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 	Governance governance;
+	address pairAddress;
 
 	function setUp() public {
 		governance = Governance(payable(router.getGovernance()));
@@ -36,33 +37,45 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 
 		gainz.approve(address(router), paymentA.amount);
 
-		router.createPair(paymentA, paymentB);
+		(pairAddress, )=router.createPair(paymentA, paymentB);
+
 		wNative.receiveFor{ value: 50 ether }(address(this));
 	}
 
 	function testFuzz_stake(
 		uint256 amount,
+		uint256 amountARatio,
 		uint256 epochsLocked,
 		bool stakeGainz
 	) public {
-		IERC20 stakeToken = IERC20(
-			stakeGainz ? address(gainz) : address(wNative)
+		amount = bound(amount,25_00,50_00);
+		amountARatio = bound(amountARatio,25_00,50_00);
+		
+		TokenPayment memory payment = TokenPayment({
+			nonce: 0,
+			amount:amount,
+			token: stakeGainz ? address(gainz) : address(wNative)
+		});
+		vm.assume(
+			1e-15 ether <= payment.amount &&
+			payment.amount <= IERC20(payment.token).balanceOf(pairAddress)
 		);
-		vm.assume(1e-15 ether <= amount && amount <= stakeToken.balanceOf(address(this)));
+	uint256	amountInA = amount * amountARatio /100_000;
+	uint256 amountInB= amount - amountInA;
+
 		epochsLocked = bound(
 			epochsLocked,
 			GTokenLib.MIN_EPOCHS_LOCK,
 			GTokenLib.MAX_EPOCHS_LOCK
 		);
 
-		TokenPayment memory payment = TokenPayment({
-			nonce: 0,
-			amount: amount,
-			token: address(stakeToken)
-		});
 		address[][3] memory paths;
-		uint256 amountOutMinA = 1;
-		uint256 amountOutMinB = 1;
+		uint256 [2][2] memory path_AB_amounts;
+
+		path_AB_amounts[0][0] = amountInA;
+		path_AB_amounts[0][1] = 1;
+		path_AB_amounts[1][0] = amountInB;
+		path_AB_amounts[1][1] = 1;
 
 		address[] memory pathA = new address[](1);
 		address[] memory pathB = new address[](2);
@@ -78,15 +91,15 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 		paths[1] = pathB;
 		paths[2] = pathToNative;
 
-		stakeToken.approve(address(governance), amount);
+		IERC20(payment.token).approve(address(governance), payment.amount);
 
 		vm.warp(block.timestamp + 20 minutes);
 		governance.stake(
 			payment,
 			epochsLocked,
 			paths,
-			amountOutMinA,
-			amountOutMinB
+			path_AB_amounts,
+			block.timestamp+1
 		);
 		governance.unStake(1, 1, 1);
 	}
