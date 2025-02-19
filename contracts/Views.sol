@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.28;
 import { AMMLibrary } from "./libraries/AMMLibrary.sol";
+import { Pair } from "./Pair.sol";
 
 contract Views {
 	address public immutable router;
@@ -9,6 +10,25 @@ contract Views {
 	constructor(address _router, address _pairsBeacon) {
 		router = _router;
 		pairsBeacon = _pairsBeacon;
+	}
+
+	function feePercent(
+		Pair pair,
+		address token,
+		uint256 amount
+	) external view returns (uint256) {
+		address token0 = pair.token0();
+		address token1 = pair.token1();
+
+		require(token0 == token || token1 == token, "Invalid pair token");
+
+		(uint256 reserve0, uint256 reserve1, ) = pair.getReserves();
+
+		return
+			pair.calculateFeePercent(
+				amount,
+				token == token0 ? reserve0 : reserve1
+			);
 	}
 
 	function getQuote(
