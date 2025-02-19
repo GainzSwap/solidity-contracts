@@ -2,8 +2,6 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Router } from "../../typechain-types";
 import { getAmount, getSwapTokens, randomNumber } from "../../utilities";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { hours } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 
 export default async function stake(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nStaking");
@@ -22,8 +20,6 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
       swapTokens.splice(randomNumber(0, swapTokens.length), 1)[0],
     ];
 
-    console.log({ tokenA, tokenB, wnative });
-
     const amount = await getAmount(account, tokenA, ethers, wnative);
     console.log(`Staking ${ethers.formatEther(amount)}`);
 
@@ -31,18 +27,22 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
       const token0 = await ethers.getContractAt("ERC20", tokenA);
       await token0.connect(account).approve(governance, amount);
     }
-
+    const amountInA = (BigInt(randomNumber(25, 70).toFixed(0)) * amount) / 100n;
+    const amountOutMinA = 1n;
+    const amountInB = amount - amountInA;
+    const amountOutMinB = 1n;
     try {
-      await governance
-        .connect(account)
-        .stake(
-          { amount, token: tokenA, nonce: 0 },
-          randomNumber(0, 1081),
-          [[tokenA], [tokenA, tokenB], tokenA === wnative ? [] : [tokenA, wnative]],
-          1n,
-          1n,
-          { value: tokenA === wnative ? amount : 0 },
-        );
+      await governance.connect(account).stake(
+        { amount, token: tokenA, nonce: 0 },
+        randomNumber(0, 1081),
+        [[tokenA], [tokenA, tokenB], tokenA === wnative ? [] : [tokenA, wnative]],
+        [
+          [amountInA, amountOutMinA],
+          [amountInB, amountOutMinB],
+        ],
+        Number.MAX_SAFE_INTEGER,
+        { value: tokenA === wnative ? amount : 0 },
+      );
     } catch (error) {
       console.error(error);
     }
