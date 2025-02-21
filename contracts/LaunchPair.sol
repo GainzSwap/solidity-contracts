@@ -260,7 +260,8 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		uint256 _campaignId,
 		uint256 referrerId
 	) external payable campaignExists(_campaignId) isNotExpired(_campaignId) {
-		require(msg.value >= 0.001 ether, "Minimum contribution is 0.001 $EDU");
+		require(msg.value >= 1 ether, "Minimum contribution is 1 $EDU");
+		
 		MainStorage storage $ = _getMainStorage();
 
 		Router router = Router(
