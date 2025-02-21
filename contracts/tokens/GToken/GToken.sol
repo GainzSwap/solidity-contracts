@@ -148,6 +148,11 @@ contract GToken is SFT {
 		}
 	}
 
+	function setURI(string memory _uri) external {
+		assert(bytes(uri(0)).length == 0);
+		_setURI(_uri);
+	}
+
 	/**
 	 * @notice Retrieves the governance token balance and attributes for a specific user at a given nonce.
 	 * @dev This function checks if the user has a Semi-Fungible Token (SFT) at the provided nonce.
@@ -177,6 +182,17 @@ contract GToken is SFT {
 				balanceOf(user, nonce),
 				_getRawTokenAttributes(nonce)
 			);
+	}
+
+	function getAttributes(
+		uint256 nonce
+	) external view returns (GTokenLib.Attributes memory) {
+		return
+			abi.decode(_getRawTokenAttributes(nonce), (GTokenLib.Attributes));
+	}
+
+	function epochs() external view returns (Epochs.Storage memory) {
+		return _getGTokenStorage().epochs;
 	}
 
 	function _packageGTokenBalance(

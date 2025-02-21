@@ -9,7 +9,7 @@ import delegate from "./delegate";
 import unDelegate from "./unDelegate";
 import transferWNTV from "./transferWNTV";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { hours, minutes } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
+import { minutes } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 
 task("e2e", "").setAction(async (_, hre) => {
   const actions = [claimRewards, stake, swap, transferWNTV, delegate, unDelegate, fundCampaign];

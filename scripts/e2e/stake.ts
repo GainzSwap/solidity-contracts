@@ -23,25 +23,32 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
     const amount = await getAmount(account, tokenA, ethers, wnative);
     console.log(`Staking ${ethers.formatEther(amount)}`);
 
-    if (tokenA !== wnative) {
-      const token0 = await ethers.getContractAt("ERC20", tokenA);
-      await token0.connect(account).approve(governance, amount);
-    }
     const amountInA = (BigInt(randomNumber(25, 70).toFixed(0)) * amount) / 100n;
     const amountOutMinA = 1n;
     const amountInB = amount - amountInA;
     const amountOutMinB = 1n;
+
+    const value = tokenA == wnative && randomNumber(0, 100) <= 55 ? amount : undefined;
+    if (!value) {
+      const token0 = await ethers.getContractAt("ERC20", tokenA);
+      await token0.connect(account).approve(governance, amount);
+    }
+
+    const pathA = [tokenA];
+    const pathB = [tokenA, tokenB];
+    const pathToNative = pathA[0] == wnative ? pathB.reverse() : [tokenA, wnative];
+
     try {
-      await governance.connect(account).stake(
-        { amount, token: tokenA, nonce: 0 },
+      const { data } = await governance.connect(account).stake(
+        { amount, token: pathA[0], nonce: 0 },
         randomNumber(0, 1081),
-        [[tokenA], [tokenA, tokenB], tokenA === wnative ? [] : [tokenA, wnative]],
+        [pathA, pathB, pathToNative],
         [
           [amountInA, amountOutMinA],
           [amountInB, amountOutMinB],
         ],
         Number.MAX_SAFE_INTEGER,
-        { value: tokenA === wnative ? amount : 0 },
+        { value },
       );
     } catch (error) {
       console.error(error);

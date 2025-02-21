@@ -23,10 +23,9 @@
     "@openzeppelin/contracts": "^5.0.2",
     "@openzeppelin/contracts-upgradeable": "^5.0.2",
     "@typechain/ethers-v6": "~0.5.1",
-    "@uniswap/lib": "4.0.1-alpha",
     "dotenv": "~16.0.3",
     "envfile": "~6.18.0",
-    "prb-math": "^2.4.3",
+    "prb-math": "~2.4.3",
     "qrcode": "~1.5.1"
   },
   "devDependencies": {

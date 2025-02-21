@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.28;
 import { AMMLibrary } from "./libraries/AMMLibrary.sol";
+import { LiquidityMathLibrary } from "./libraries/LiquidityMathLibrary.sol";
 import { Pair } from "./Pair.sol";
 
 contract Views {
@@ -45,6 +46,21 @@ contract Views {
 
 			amountIn = amountOut = quote(amountIn, reserveIn, reserveOut);
 		}
+	}
+
+	function getLiquidityValue(
+		address tokenA,
+		address tokenB,
+		uint256 liquidityAmount
+	) external view returns (uint256 tokenAAmount, uint256 tokenBAmount) {
+		return
+			LiquidityMathLibrary.getLiquidityValue(
+				router,
+				pairsBeacon,
+				tokenA,
+				tokenB,
+				liquidityAmount
+			);
 	}
 
 	// **** AMM LIBRARY FUNCTIONS ****
