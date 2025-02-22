@@ -70,7 +70,7 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   );
 
   try {
-    const uriPath = "/api/gToken/metadata/{id}.json" as const;
+    const uriPath = "/api/gToken/{id}.json" as const;
     const uri = (isLocalnet ? "http://localhost:3000" : "https://gainzswap.xyz") + uriPath;
     await newGToken.setURI(uri);
   } catch (error) {
