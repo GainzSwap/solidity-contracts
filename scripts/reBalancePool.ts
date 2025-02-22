@@ -34,7 +34,7 @@ task("reBalancePool").setAction(async (_, hre) => {
   // await token1.approve(router, reserve1);
 
   const block = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
-  let deadline = (block?.timestamp || 0) + 500;
+  let deadline = (block?.timestamp || 0) + 50;
   while (true) {
     const { reserve0, reserve1 } = await pair.getReserves();
     const [[usdc, usdcReserve], [edu, eduReserve]] =
@@ -59,7 +59,7 @@ task("reBalancePool").setAction(async (_, hre) => {
       usdcShare: formatUnits((userPairLiq * usdcReserve) / totalPairLiq, 6),
     });
 
-    if (ratio <= parseEther("3.696360")) break;
+    if (ratio <= parseEther("3.732700")) break;
 
     const amountIn = (usdcReserve * 4n) / 10_000n;
     const amountOut = (eduReserve * amountIn) / usdcReserve;
@@ -72,7 +72,7 @@ task("reBalancePool").setAction(async (_, hre) => {
       deadline,
     );
 
-    deadline += 500;
+    deadline += 50;
 
     console.log({ hash });
   }
