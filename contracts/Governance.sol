@@ -357,7 +357,8 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 	}
 
 	function _computeLiqValue(
-		GovernanceStorage storage $,
+		address router,
+		address wNativeToken,
 		TokenPayment memory paymentA,
 		TokenPayment memory paymentB,
 		address[] calldata pathToNative
@@ -365,23 +366,19 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		// Validate the pathToNative
 		if (
 			pathToNative.length < 2 || // `pathToNative` must have valid length
-			pathToNative[pathToNative.length - 1] != $.wNativeToken || // The last token must be the native token (i.e., the reference token)
+			pathToNative[pathToNative.length - 1] != wNativeToken || // The last token must be the native token (i.e., the reference token)
 			(pathToNative[0] != paymentA.token &&
 				pathToNative[0] != paymentB.token) // The first token must be one of the payment tokens
 		) revert InvalidPath(pathToNative);
 
-		// Determine which payment token to use for the conversion
-		TokenPayment memory payment = pathToNative[0] == paymentA.token
-			? paymentA
-			: paymentB;
-
 		// Get the PriceOracle instance
 		PriceOracle priceOracle = PriceOracle(
-			OracleLibrary.oracleAddress($.router)
+			OracleLibrary.oracleAddress(router)
 		);
 
 		// Start with the payment amount
-		value = payment.amount;
+		value = (pathToNative[0] == paymentA.token ? paymentA : paymentB)
+			.amount;
 
 		// Convert the payment amount to the native token using the provided path
 		for (uint256 i = 0; i < pathToNative.length - 1; i++) {
@@ -392,6 +389,8 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			);
 		}
 
+		value *= 2;
+
 		// Ensure the computed value is valid
 		require(value > 0, "Governance: INVALID_COMPUTED_LIQ_VALUE");
 	}
@@ -401,7 +400,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		address router,
 		address wNativeToken
 	) internal {
-		bool paymentIsNative = msg.value > 0;
+		bool paymentIsNative = msg.value > 0 && payment.token == wNativeToken;
 
 		if (paymentIsNative) payment.token = address(0);
 		payment.receiveTokenFor(msg.sender, address(this), wNativeToken);
@@ -411,11 +410,89 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		payment.approve(router);
 	}
 
+	/**
+	 * @notice Stakes liquidity by providing two token payments and receiving governance tokens (GToken).
+	 * @dev Handles native token wrapping if one of the tokens is the wrapped native token (wNativeToken).
+	 * @param paymentA Token payment details for token A.
+	 * @param paymentB Token payment details for token B.
+	 * @param epochsLocked Number of epochs the liquidity is locked for.
+	 * @param numbers Array containing [0]: amountAMin, [1]: amountBMin, [2]: deadline.
+	 * @param pathToNative Swap path to native token for calculations.
+	 * @return uint256 Nonce of GToken minted.
+	 */
+	function stakeLiquidity(
+		TokenPayment calldata paymentA,
+		TokenPayment calldata paymentB,
+		uint256 epochsLocked,
+		uint[3] calldata numbers, // [0]: amountAMin, [1]: amountBMin, [2]: deadline
+		address[] calldata pathToNative
+	) external payable returns (uint256) {
+		GovernanceStorage storage $ = _getGovernanceStorage();
+
+		// Handle native token deposit if required
+		if (msg.value > 0) {
+			require(
+				msg.value ==
+					(
+						$.wNativeToken == paymentA.token
+							? paymentA.amount
+							: paymentB.amount
+					),
+				"Governance: INVALID_AMOUNT_IN_VALUES"
+			);
+		}
+
+		_receiveAndApprovePayment(paymentA, $.router, $.wNativeToken);
+		_receiveAndApprovePayment(paymentB, $.router, $.wNativeToken);
+
+		// Construct liquidity info arguments separately to avoid stack too deep error
+		LiqInfoOtherArgs memory liqInfoArgs = LiqInfoOtherArgs({
+			amountAMin: numbers[0],
+			amountBMin: numbers[1],
+			deadline: numbers[2],
+			wNativeToken: $.wNativeToken
+		});
+
+		return
+			_mintGToken(
+				msg.sender,
+				$.gtoken,
+				$.rewardPerShare,
+				epochsLocked,
+				_getLiqInfo(
+					$.router,
+					paymentA,
+					paymentB,
+					pathToNative,
+					liqInfoArgs
+				)
+			);
+	}
+
+	/**
+	 * @notice Allows users to stake tokens for a specified duration into a particular pool.
+	 * @dev Handles token payments, token swapping, and staking with predefined paths.
+	 * @param payment The token payment details including amount and token address.
+	 * @param epochsLocked The number of epochs the tokens will be locked for.
+	 * @param paths The swap paths used for staking:
+	 *        - paths[0]: Path A (payment token to tokenA)
+	 *        - paths[1]: Path B (payment token to tokenB)
+	 *        - paths[2]: Path to Native token for liquidity value.
+	 * @param path_AB_amounts Swap amounts and slippage limits:
+	 *        - path_AB_amounts[0]: For Path A:
+	 *          - [0]: amountIn (tokenA amount)
+	 *          - [1]: amountOutMin (minimum expected output)
+	 *        - path_AB_amounts[1]: For Path B:
+	 *          - [0]: amountIn (tokenB amount)
+	 *          - [1]: amountOutMin (minimum expected output)
+	 * @param deadline The transaction deadline to prevent execution if expired.
+	 * @return The GToken nonce.
+	 */
 	function stake(
 		TokenPayment calldata payment,
 		uint256 epochsLocked,
-		address[][3] calldata paths, // 0 -> pathA, 1 -> pathB, 2 -> pathToNative
-		uint256[2][2] calldata path_AB_amounts, // [0]: pathA_amounts, [1]: pathB_amounts
+		address[][3] calldata paths,
+		uint256[2][2] calldata path_AB_amounts,
 		uint256 deadline
 	) external payable returns (uint256) {
 		// Validate the payment amount
@@ -452,29 +529,83 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			);
 
 			// Approve the router to spend the swapped tokens
-			if (paymentA.token != payment.token) paymentA.approve($.router);
-			if (paymentB.token != payment.token) paymentB.approve($.router);
+			paymentA.approve($.router);
+			paymentB.approve($.router);
 
-			// Set liquidity info
-			(liqInfo.token0, liqInfo.token1) = paymentA.token < paymentB.token
-				? (paymentA.token, paymentB.token)
-				: (paymentB.token, paymentA.token);
-
-			// Add liquidity using the router
-			(, , liqInfo.liquidity, liqInfo.pair) = Router(payable($.router))
-				.addLiquidity(paymentA, paymentB, 0, 0, block.timestamp + 1);
-
-			// Compute the liquidity value
-			liqInfo.liqValue =
-				_computeLiqValue($, paymentA, paymentB, paths[2]) *
-				2;
+			liqInfo = _getLiqInfo(
+				$.router,
+				paymentA,
+				paymentB,
+				paths[2],
+				LiqInfoOtherArgs(
+					path_AB_amounts[0][1], // amountAMin
+					path_AB_amounts[1][1], // amountBMin
+					deadline,
+					$.wNativeToken
+				)
+			);
 		}
 
 		// Mint GToken tokens for the user
 		return
-			GToken($.gtoken).mintGToken(
+			_mintGToken(
 				msg.sender,
+				$.gtoken,
 				$.rewardPerShare,
+				epochsLocked,
+				liqInfo
+			);
+	}
+
+	struct LiqInfoOtherArgs {
+		uint amountAMin;
+		uint amountBMin;
+		uint deadline;
+		address wNativeToken;
+	}
+
+	function _getLiqInfo(
+		address router,
+		TokenPayment memory paymentA,
+		TokenPayment memory paymentB,
+		address[] calldata pathToNative,
+		LiqInfoOtherArgs memory args
+	) internal returns (LiquidityInfo memory liqInfo) {
+		// Add liquidity using the router
+		(, , liqInfo.liquidity, liqInfo.pair) = Router(payable(router))
+			.addLiquidity(
+				paymentA,
+				paymentB,
+				args.amountAMin,
+				args.amountBMin,
+				args.deadline
+			);
+
+		// Compute the liquidity value
+		liqInfo.liqValue = _computeLiqValue(
+			router,
+			args.wNativeToken,
+			paymentA,
+			paymentB,
+			pathToNative
+		);
+
+		(liqInfo.token0, liqInfo.token1) = paymentA.token < paymentB.token
+			? (paymentA.token, paymentB.token)
+			: (paymentB.token, paymentA.token);
+	}
+
+	function _mintGToken(
+		address to,
+		address gToken,
+		uint256 rewardPerShare_,
+		uint256 epochsLocked,
+		LiquidityInfo memory liqInfo
+	) internal returns (uint256) {
+		return
+			GToken(gToken).mintGToken(
+				to,
+				rewardPerShare_,
 				epochsLocked,
 				liqInfo
 			);

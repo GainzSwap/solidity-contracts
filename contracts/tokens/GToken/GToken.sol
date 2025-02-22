@@ -54,11 +54,11 @@ contract GToken is SFT {
 	/// @notice Constructor to initialize the GToken contract.
 	/// @dev Sets the name and symbol of the SFT for GToken.
 	function initialize(
-		Epochs.Storage memory epochs,
+		Epochs.Storage memory _epochs,
 		address initialOwner
 	) public initializer {
 		__SFT_init("GainzSwap Governance Token", "GToken", initialOwner);
-		_getGTokenStorage().epochs = epochs;
+		_getGTokenStorage().epochs = _epochs;
 	}
 
 	/// @notice Mints a new GToken for the given address.

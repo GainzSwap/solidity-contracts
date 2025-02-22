@@ -103,4 +103,59 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 		);
 		governance.unStake(1, 1, 1);
 	}
+
+
+    function testFuzz_stakeLiquidity(
+        uint256 amountA,
+        uint256 amountB,
+        uint256 epochsLocked,
+        bool nativePay
+    ) public {
+		vm.assume(
+			1e-15 ether <= amountA &&
+			amountA <=  wNative.balanceOf(address(this))
+		);
+		vm.assume(
+			1e-15 ether <= amountB &&
+			amountB <= gainz.balanceOf(address(this))
+		);
+
+        TokenPayment memory paymentA = TokenPayment({
+            nonce: 0,
+            amount: amountA,
+            token: address(wNative)
+        });
+        TokenPayment memory paymentB = TokenPayment({
+            nonce: 0,
+            amount: amountB,
+            token: address(gainz)
+        });
+
+        epochsLocked = bound(
+            epochsLocked,
+            GTokenLib.MIN_EPOCHS_LOCK,
+            GTokenLib.MAX_EPOCHS_LOCK
+        );
+
+        address[] memory pathToNative = new address[](2);
+        pathToNative[0] = paymentB.token;
+        pathToNative[1] = address(wNative);
+
+        IERC20(paymentA.token).approve(address(governance), paymentA.amount);
+        IERC20(paymentB.token).approve(address(governance), paymentB.amount);
+
+        vm.warp(block.timestamp + 20 minutes);
+        governance.stakeLiquidity{ value: !nativePay ? 0 : paymentA.amount }(
+            paymentA,
+            paymentB,
+            epochsLocked,
+            [
+				1, // amountAMin
+				1, // amountBMin
+				block.timestamp + 1 // deadline
+			],
+            pathToNative
+        );
+		governance.unStake(1, 1, 1);
+    }
 }

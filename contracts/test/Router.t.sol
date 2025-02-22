@@ -14,7 +14,6 @@ contract RouterTest is Test, RouterFixture {
 	TestERC20 token1;
 
 	function setUp() public {
-		vm.prank(address(router));
 		wNative.setYuzuAggregator(address(899999));
 	}
 
