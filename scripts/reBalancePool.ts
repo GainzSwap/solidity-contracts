@@ -2,6 +2,9 @@ import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { Router } from "../typechain-types";
 import { formatEther, formatUnits, parseEther } from "ethers";
+import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { getSwapTokens } from "../utilities";
 
 task("reBalancePool").setAction(async (_, hre) => {
   const { ethers } = hre;
@@ -59,7 +62,15 @@ task("reBalancePool").setAction(async (_, hre) => {
       usdcShare: formatUnits((userPairLiq * usdcReserve) / totalPairLiq, 6),
     });
 
-    if (ratio <= parseEther("3.732700")) break;
+    if (ratio <= parseEther("3.631150")) break;
+
+    // const eduBal = await (await ethers.getContractAt("ERC20", edu)).balanceOf(deployer);
+    // eduBal > 0n &&
+    //   (await stake(
+    //     hre,
+    //     [await ethers.getSigner(deployer)],
+    //     await (await ethers.getContractAt("ERC20", edu)).balanceOf(deployer),
+    //   ));
 
     const amountIn = (usdcReserve * 4n) / 10_000n;
     const amountOut = (eduReserve * amountIn) / usdcReserve;
@@ -77,3 +88,45 @@ task("reBalancePool").setAction(async (_, hre) => {
     console.log({ hash });
   }
 });
+
+async function stake(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[], amount: bigint) {
+  console.log("\nStaking");
+  const { ethers } = hre;
+  const { deployer } = await hre.getNamedAccounts();
+  const router = await ethers.getContract<Router>("Router", deployer);
+  const governance = await ethers.getContractAt("Governance", await router.getGovernance());
+  const wnative = await router.getWrappedNativeToken();
+
+  const { swapTokens } = await getSwapTokens(router, ethers);
+
+  for (const account of accounts) {
+    if (swapTokens.length < 2) continue;
+
+    console.log(`Staking ${ethers.formatEther(amount)}`);
+
+    const amountInA = amount / 2n;
+    const amountOutMinA = 1n;
+    const amountInB = amount - amountInA;
+    const amountOutMinB = 1n;
+
+    const usdc = swapTokens.find(token => token !== wnative)!;
+    const pathA = [wnative];
+    const pathB = [wnative, usdc];
+    const pathToNative = [usdc, wnative];
+
+    try {
+      const { data } = await governance.connect(account).stake(
+        { amount, token: pathA[0], nonce: 0 },
+        120,
+        [pathA, pathB, pathToNative],
+        [
+          [amountInA, amountOutMinA],
+          [amountInB, amountOutMinB],
+        ],
+        Number.MAX_SAFE_INTEGER,
+      );
+    } catch (error) {
+      console.error(error);
+    }
+  }
+}
