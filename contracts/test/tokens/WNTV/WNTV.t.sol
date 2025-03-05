@@ -17,9 +17,9 @@ contract WNTVTest is Test {
 
 	function testWithdraw(
 		uint256 amount,
-		address owner,
 		uint256 timestamp
 	) external {
+		address owner = msg.sender;
 		timestamp = bound(timestamp, 0, 1000 * 366 days);
 
 		vm.assume(amount <= 1_000_000_000 ether && owner != address(0));
