@@ -88,7 +88,7 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 		withdrawal.readyTimestamp =
 			block.timestamp -
 			(block.timestamp % 24 hours) +
-			48 hours;
+			10 days;
 		withdrawal.amount += amount;
 
 		_getWNTVStorage().pendingWithdrawals += amount;
