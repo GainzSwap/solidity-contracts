@@ -26,6 +26,7 @@ import "./scripts/refund";
 import "./scripts/createHDWallet";
 import "./scripts/settleWithdrawals";
 import "./scripts/reBalancePool";
+import "./scripts/semOnePoints";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY!;
