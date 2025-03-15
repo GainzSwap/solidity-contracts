@@ -9,7 +9,7 @@ interface IRouter {
 		address indexed tokenIn,
 		address indexed tokenOut,
 		uint256 amountOut,
-		uint256 feeAmountOut
+		uint256 feePercentOut
 	);
 
 	function createPair(

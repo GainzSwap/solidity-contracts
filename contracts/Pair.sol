@@ -355,8 +355,8 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		PairStorage storage $ = _getPairStorage();
 
 		return (
-			$.minFee == 0 ? MINIMUM_FEE : $.minFee,
-			$.maxFee == 0 ? MAXIMUM_FEE : $.maxFee
+			$.minFee < MINIMUM_FEE ? MINIMUM_FEE : $.minFee,
+			$.maxFee < MAXIMUM_FEE ? MAXIMUM_FEE : $.maxFee
 		);
 	}
 }

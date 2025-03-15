@@ -43,18 +43,20 @@ library RouterLib {
 		for (uint i; i < path.length - 1; i++) {
 			(address input, address output) = (path[i], path[i + 1]);
 			uint amount0Out;
-			uint feeAmount0;
+			uint feePercent0;
 			uint amount1Out;
-			uint feeAmount1;
+			uint feePercent1;
 
 			{
 				(address token0, ) = AMMLibrary.sortTokens(input, output);
 				uint amountOut = amounts[i + 1][0];
-				uint feeAmount = amounts[i + 1][1];
-				(amount0Out, feeAmount0, amount1Out, feeAmount1) = input ==
+				uint feePercent = amounts[i + 1][1];
+				(amount0Out, feePercent0, amount1Out, feePercent1) = input ==
 					token0
-					? (uint(0), uint(0), amountOut, feeAmount)
-					: (amountOut, feeAmount, uint(0), uint(0));
+					? (uint(0), uint(0), amountOut, feePercent)
+					: (amountOut, feePercent, uint(0), uint(0));
+
+				emit IRouter.Swap(_to, input, output, amountOut, feePercent);
 			}
 
 			address to = i < path.length - 2
@@ -66,16 +68,8 @@ library RouterLib {
 				)
 				: _to;
 			IPair(AMMLibrary.pairFor(address(this), pairsBeacon, input, output))
-				.swap(amount0Out, feeAmount0, amount1Out, feeAmount1, to);
+				.swap(amount0Out, feePercent0, amount1Out, feePercent1, to);
 		}
-
-		emit IRouter.Swap(
-			_to,
-			path[0],
-			path[path.length - 1],
-			amounts[amounts.length - 1][0],
-			amounts[amounts.length - 1][1]
-		);
 	}
 
 	function _addLiquidity(
