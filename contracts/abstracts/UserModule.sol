@@ -65,6 +65,12 @@ library UserModuleLib {
 
 		// Increment user count and assign new user ID
 		$.userCount++;
+
+		// Prevent self referral
+		if (referrerId == $.userCount) {
+			referrerId = 0;
+		}
+
 		$.users[userAddr] = User({
 			id: $.userCount,
 			addr: userAddr,
