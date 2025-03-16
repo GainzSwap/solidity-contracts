@@ -7,12 +7,13 @@ import fundCampaign from "./fundCampaign";
 import claimRewards from "./claimRewards";
 import delegate from "./delegate";
 import unDelegate from "./unDelegate";
-import transferWNTV from "./transferWNTV";
+import transferToken from "./transferToken";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { minutes } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
+import unStake from "./unStake";
 
 task("e2e", "").setAction(async (_, hre) => {
-  const actions = [claimRewards, stake, swap, transferWNTV, delegate, unDelegate, fundCampaign];
+  const actions = [claimRewards, stake, unStake, swap, transferToken, delegate, unDelegate, fundCampaign];
   const accounts = await hre.ethers.getSigners();
 
   while (true) {
@@ -25,6 +26,8 @@ task("e2e", "").setAction(async (_, hre) => {
         try {
           await action(hre, selectedAccounts);
         } catch (error: any) {
+          console.log("runing", action.name);
+
           if (
             !["INSUFFICIENT_INPUT_AMOUNT", "ECONNRESET", "EADDRNOTAVAIL", "other side closed"].some(errString =>
               error.toString().includes(errString),

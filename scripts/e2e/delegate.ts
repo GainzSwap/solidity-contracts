@@ -19,10 +19,6 @@ export default async function delegate(hre: HardhatRuntimeEnvironment, accounts:
 
     console.log(`Delegating ${ethers.formatEther(amount)}`);
 
-    try {
-      await wnative.connect(account).receiveFor(account, { value: amount });
-    } catch (error) {
-      console.error(error);
-    }
+    await wnative.connect(account).receiveFor(account, { value: amount });
   }
 }

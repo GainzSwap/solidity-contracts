@@ -97,7 +97,7 @@ async function saveLibraries(libraries: Record<string, string>, contractName: st
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Router } from "./typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { getCreate2Address, keccak256, solidityPackedKeccak256 } from "ethers";
+import { getCreate2Address, keccak256, solidityPackedKeccak256, ZeroAddress } from "ethers";
 
 export async function getDeploymentTxHashFromNetwork(
   hre: HardhatRuntimeEnvironment,
@@ -187,3 +187,17 @@ export function computePriceOracleAddr(routerAddress: string) {
     keccak256(PriceOralcleBuild.bytecode),
   );
 }
+
+export const getRandomItem = <T = any>(array: T[]) => array[Math.floor((Math.random() * array.length) % array.length)];
+
+export const runInErrorBoundry = async (cb: Function, acceptedErrStrings: string[]) => {
+  try {
+    await cb();
+  } catch (error: any) {
+    if (!acceptedErrStrings.some(errString => error.toString().includes(errString))) {
+      throw error;
+    }
+
+    console.log(error);
+  }
+};

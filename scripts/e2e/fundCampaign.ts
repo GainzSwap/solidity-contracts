@@ -21,20 +21,16 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
     if (deadline <= (await time.latest())) continue;
 
     for (const account of accounts) {
-      try {
-        const amount = await ethers.provider.getBalance(account.address).then(bal => {
-          const randBal = Math.floor(Math.random() * +bal.toString());
-          return BigInt(randBal) / 100_000n;
-        });
+      const amount = await ethers.provider.getBalance(account.address).then(bal => {
+        const randBal = Math.floor(Math.random() * +bal.toString());
+        return BigInt(randBal) / 100_000n;
+      });
 
-        const totalUsers = +(await router.totalUsers()).toString();
-        const referrerId = [0, 1, 2, 3, 4, 5][(totalUsers + 1) % 3];
-        await launchPair.connect(account).contribute(campaignId, referrerId, { value: amount });
+      const totalUsers = +(await router.totalUsers()).toString();
+      const referrerId = [0, 1, 2, 3, 4, 5][(totalUsers + 1) % 3];
+      await launchPair.connect(account).contribute(campaignId, referrerId, { value: amount });
 
-        console.log(`${account.address} funded campaign ${campaignId}`);
-      } catch (error) {
-        console.log(error);
-      }
+      console.log(`${account.address} funded campaign ${campaignId}`);
     }
   }
 }

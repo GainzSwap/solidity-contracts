@@ -18,11 +18,6 @@ export default async function unDelegate(hre: HardhatRuntimeEnvironment, account
     });
 
     console.log(`Un Delegating ${ethers.formatEther(amount)}`);
-
-    try {
-      await wnative.connect(account).withdraw(amount);
-    } catch (error) {
-      console.error(error);
-    }
+    await wnative.connect(account).withdraw(amount);
   }
 }
