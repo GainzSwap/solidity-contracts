@@ -2,24 +2,30 @@ import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { Router } from "../typechain-types";
 
-task("refund", "").setAction(async (_, hre) => {
-  const { ethers } = hre;
-  const { deployer, newFeeTo } = await hre.getNamedAccounts();
+task("refund", "")
+  .addParam("id")
+  .setAction(async ({ id }, hre) => {
+    const { ethers } = hre;
+    const { deployer, newFeeTo } = await hre.getNamedAccounts();
 
-  const router = await ethers.getContract<Router>("Router", deployer);
-  const governanceAddress = await router.getGovernance();
-  const governance = await ethers.getContractAt("Governance", governanceAddress);
+    const router = await ethers.getContract<Router>("Router", deployer);
+    const governanceAddress = await router.getGovernance();
+    const governance = await ethers.getContractAt("Governance", governanceAddress);
 
-  const launchPairAddress = await governance.launchPair();
-  const launchPair = await ethers.getContractAt("LaunchPair", launchPairAddress);
+    const launchPairAddress = await governance.launchPair();
+    const launchPair = await ethers.getContractAt("LaunchPair", launchPairAddress);
 
-  const { fundsRaised } = await launchPair.getCampaignDetails(1);
-  const tx = {
-    to: launchPair,
-    value: fundsRaised,
-    gasLimit: 21000,
-  };
+    const { fundsRaised } = await launchPair.getCampaignDetails(BigInt(id));
 
-  const signer = await ethers.getSigner(newFeeTo);
-  await signer.sendTransaction(tx);
-});
+    const tx = {
+      to: launchPair,
+      value: fundsRaised,
+    };
+
+    const signer = await ethers.getSigner(newFeeTo);
+    const balance = await signer.provider.getBalance(signer);
+
+    if (balance < fundsRaised) throw "Insufficeint Balance";
+
+    await signer.sendTransaction(tx);
+  });
