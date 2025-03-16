@@ -439,6 +439,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 
 		// Update the status to Failed
 		campaign.status = CampaignStatus.Failed;
+		$.activeCampaigns.remove(_campaignId);
 
 		payable(msg.sender).transfer(amount);
 
