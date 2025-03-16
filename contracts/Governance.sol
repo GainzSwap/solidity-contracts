@@ -60,7 +60,7 @@ library GovernanceLib {
 			.attributes;
 
 		require(
-			attributes.epochsLeft(currentEpoch) >= 1000,
+			attributes.epochsLeft(currentEpoch) >= 1079,
 			"Security GToken Payment Expired"
 		);
 
