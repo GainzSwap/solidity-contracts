@@ -16,7 +16,7 @@ contract SystemInvariantTest is Test {
 		targetSelector(
 			FuzzSelector({ addr: address(handler), selectors: selectors })
 		);
-        
+
 		targetContract(address(handler));
 	}
 }

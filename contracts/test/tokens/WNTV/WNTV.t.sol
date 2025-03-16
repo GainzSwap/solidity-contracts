@@ -15,10 +15,7 @@ contract WNTVTest is Test {
 		wntv.setYuzuAggregator(address(this));
 	}
 
-	function testWithdraw(
-		uint256 amount,
-		uint256 timestamp
-	) external {
+	function testWithdraw(uint256 amount, uint256 timestamp) external {
 		address owner = msg.sender;
 		timestamp = bound(timestamp, 0, 1000 * 366 days);
 
