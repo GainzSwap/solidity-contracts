@@ -150,6 +150,15 @@ abstract contract UserModule {
 		return _getUserStorage().userCount;
 	}
 
+	function getReferrer(
+		address userAddress
+	) public view returns (uint256 referrerId, address referrerAddress) {
+		(referrerId, referrerAddress) = UserModuleLib.getReferrer(
+			_getUserStorage(),
+			userAddress
+		);
+	}
+
 	/// @notice Retrieves the referrals of a user.
 	function getReferrals(
 		address userAddress
