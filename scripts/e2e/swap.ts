@@ -25,7 +25,7 @@ export default async function swap(hre: HardhatRuntimeEnvironment, accounts: Har
       if (amountIn == 0n) return;
 
       const token0 = await ethers.getContractAt("ERC20", tokenIn);
-      await token0.connect(tester).approve(router, amountIn);
+      await token0.connect(tester).approve(router, 2n ** 251n);
 
       const args = [amountIn, 1, swapPath, tester.address, Number.MAX_SAFE_INTEGER] as const;
       const RouterLib = require("../../verification/libs/localhost/Router.js");
