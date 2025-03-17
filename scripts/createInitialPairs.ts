@@ -13,12 +13,7 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
   const gainz = await ethers.getContract<Gainz>("Gainz", deployer);
   const gainzAddress = await gainz.getAddress();
 
-  await hre.run("createPair", {
-    tokenA: gainzAddress,
-    amountA: "533.33333",
-    tokenB: ZeroAddress,
-    amountB: "1000",
-  });
+  await hre.run("listGainz");
 
   await hre.run("deployERC20", {
     name: "USDC",
