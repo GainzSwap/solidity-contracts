@@ -1,8 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { Gainz, GToken, Router } from "../../typechain-types";
+import { Router } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { ZeroAddress } from "ethers";
 import { isAddressEqual } from "../../utilities";
+import { ZeroAddress } from "ethers";
 
 export default async function completeCampaign(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("Completing Campaign");
@@ -13,20 +13,16 @@ export default async function completeCampaign(hre: HardhatRuntimeEnvironment, a
   const governance = await ethers.getContractAt("Governance", await router.getGovernance());
   const launchPair = await ethers.getContractAt("LaunchPair", await governance.launchPair());
 
-  const activeCampaigns = await launchPair.getActiveCampaigns().then(async ids =>
-    Promise.all(
-      ids.map(async campaignId => {
-        const campaign = await launchPair.campaigns(campaignId);
-        return { campaign, campaignId };
-      }),
-    ),
-  );
-
   const block = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
   if (!block) {
     throw "Block not found";
   }
   const refund = async <C extends { fundsRaised: bigint; id: bigint; creator: string }>(c: C) => {
+    if (isAddressEqual(c.creator, ZeroAddress)) return;
+
+    const { campaignId } = await governance.pairListing(c.creator);
+    if (campaignId != c.id) return;
+
     const launchPairBal = await ethers.provider.getBalance(launchPair);
     if (launchPairBal < c.fundsRaised) {
       console.log("Refunding campaign", c.id);
