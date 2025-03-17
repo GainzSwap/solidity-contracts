@@ -20,21 +20,20 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
   const wnative = await router.getWrappedNativeToken();
   const views = await ethers.getContract<Views>("Views", deployer);
 
-  const { swapTokens } = await getSwapTokens(router, ethers);
-
-  swapTokens.splice(
-    swapTokens.findIndex(t => t == wnative),
-    1,
-  );
+  const { tradePairs, makePath, findBestPath } = await getSwapTokens(router, ethers);
 
   for (const account of accounts) {
-    const tokenB = wnative;
-    const tokenA = getRandomItem(swapTokens);
-
+    const [tokenA, tokenB] = makePath(getRandomItem(tradePairs));
     const aIsWNative = isAddressEqual(tokenA, wnative);
     const bIsWNative = isAddressEqual(tokenB, wnative);
-    if (!aIsWNative && !bIsWNative) {
-      console.log({ tokenA, tokenB, wnative });
+
+    const pathToNative = aIsWNative
+      ? [tokenB, tokenA]
+      : bIsWNative
+        ? [tokenA, tokenB]
+        : findBestPath([tokenA, wnative]) || findBestPath([tokenB, wnative]);
+    if (!pathToNative?.length) {
+      console.log("No path to native for ", tokenA, tokenB);
       continue;
     }
 
@@ -54,11 +53,10 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
       await token.connect(account).approve(governance, amount);
     }
 
-    const pathToNative = [tokenA == wnative ? tokenB : tokenA, wnative];
     const value = randomNumber(0, 100) >= 55 ? undefined : aIsWNative ? amountInA : bIsWNative ? amountInB : undefined;
 
     const hasEnoughBToken =
-      (await (value
+      (await (value && bIsWNative
         ? account.provider.getBalance(account.address)
         : (await ethers.getContractAt("ERC20", tokenB)).balanceOf(account))) > amountInB;
     if (!hasEnoughBToken) continue;
