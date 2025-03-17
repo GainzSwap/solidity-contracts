@@ -102,7 +102,7 @@ abstract contract UserModule {
 	/// @notice Event emitted when a referral is added.
 	event ReferralAdded(uint256 indexed referrerId, uint256 indexed referralId);
 
-	/// @notice Storage structure for user-related data.
+	/// @custom:storage-location erc7201:userModule.storage
 	struct UserStorage {
 		uint256 userCount; // Counter for user IDs
 		mapping(address => User) users; // Mapping of user address to user data
