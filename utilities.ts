@@ -153,7 +153,7 @@ export function sleep(ms: number) {
 }
 
 export async function getSwapTokens(router: Router, ethers: typeof e) {
-  const pairs: { token0: string; token1: string; address: string }[] = [];
+  // const pairs: { token0: string; token1: string; address: string }[] = [];
   const swapTokens: Set<string> = new Set();
 
   const joiner = "@";
@@ -169,94 +169,90 @@ export async function getSwapTokens(router: Router, ethers: typeof e) {
     swapTokens.add(token0);
     swapTokens.add(token1);
 
-    pairs.push({ token0, token1, address });
-
-    tradePairs.push(makePair([token0, token1]), makePair([token1, token0]));
+    // pairs.push({ token0, token1, address });
+    tradePairs.push(makePair([token0, token1]));
   }
 
-  const cachedSwapPaths: { [key: string]: string[] | undefined } = {};
+  // const cachedSwapPaths: { [key: string]: string[] | undefined } = {};
+
+  function findBestPath([inToken, outToken]: [string, string]) {
+    if (isAddressEqual(inToken, outToken)) return [inToken];
+
+    // Build adjacency list for graph representation
+    const graph: Record<string, string[]> = {};
+
+    for (const pair of tradePairs) {
+      const [tokenA, tokenB] = makePath(pair);
+
+      if (!graph[tokenA]) graph[tokenA] = [];
+      if (!graph[tokenB]) graph[tokenB] = [];
+
+      graph[tokenA].push(tokenB);
+      graph[tokenB].push(tokenA);
+    }
+
+    // Perform BFS to find the shortest path
+    const queue: [string, string[]][] = [[inToken, [inToken]]];
+    const visited = new Set<string>([inToken]);
+
+    while (queue.length > 0) {
+      const [currentToken, path] = queue.shift()!;
+
+      if (currentToken === outToken) return path; // Found path
+
+      for (const neighbor of graph[currentToken] || []) {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          queue.push([neighbor, [...path, neighbor]]);
+        }
+      }
+    }
+
+    return null; // No valid path found
+  }
 
   return {
     swapTokens: Array.from(swapTokens),
+    tradePairs,
+    makePair,
+    makePath,
     selectTokens: () => {
       const tokens = Array.from(swapTokens);
 
-      return { tokenIn: tokens.splice(getRandomIndex(tokens))[0], tokenOut: tokens.splice(getRandomIndex(tokens))[0] };
+      if (tokens.length < 2) {
+        throw new Error("Not enough tokens to select tokenIn and tokenOut");
+      }
+
+      const index1 = getRandomIndex(tokens);
+      const tokenIn = tokens[index1];
+
+      tokens.splice(index1, 1); // Remove selected token
+
+      const index2 = getRandomIndex(tokens);
+      const tokenOut = tokens[index2];
+
+      return { tokenIn, tokenOut };
     },
-    findBestPath([inToken, outToken]: [string, string], depth = 0) {
-      if (inToken == outToken) {
-        return null;
-      }
-
-      const cacheKey = makePair([inToken, outToken]);
-
-      const cachedSwapPath = cachedSwapPaths[cacheKey];
-      if (cachedSwapPath) {
-        return cachedSwapPath;
-      }
-
-      const pathsBuilder: {
-        complete: string[];
-        fromInBetween: string[][];
-        toInBetween: string[][];
-      } = { complete: [], fromInBetween: [], toInBetween: [] };
-
-      // inclusivePaths
-      for (const pair of tradePairs) {
-        if (!(pair.includes(inToken) || pair.includes(outToken))) {
-          continue;
-        }
-
-        const path = makePath(pair);
-
-        const hasFrom = path[0] === inToken;
-        const hasTo = path.at(-1) === outToken;
-
-        if (hasFrom && hasTo) {
-          pathsBuilder.complete.push(...path);
-        } else if (hasFrom) {
-          pathsBuilder.fromInBetween.push(path);
-        } else if (hasTo) {
-          pathsBuilder.toInBetween.push(path);
-        }
-      }
-
-      while (pathsBuilder.fromInBetween.length > 0 && depth <= 4) {
-        const fromIDxBetween = pathsBuilder.fromInBetween.pop();
-        if (fromIDxBetween?.length) {
-          const last_fromIDxBetween = fromIDxBetween.at(-1)!;
-
-          for (const toIDxBetween of pathsBuilder.toInBetween) {
-            const [first_toIDxBetween] = toIDxBetween;
-            if (first_toIDxBetween == last_fromIDxBetween) {
-              // Glue them
-              pathsBuilder.complete.push(...fromIDxBetween, ...toIDxBetween.slice(1));
-            } else {
-              // Search for intermediates
-              const intermediate_path: [string, string] = [last_fromIDxBetween, first_toIDxBetween];
-              pathsBuilder.complete.push(...(this.findBestPath(intermediate_path, depth + 1) || []));
-            }
-          }
-        }
-      }
-
-      const swapPaths = pathsBuilder.complete;
-
-      if (swapPaths.length) {
-        cachedSwapPaths[cacheKey] = swapPaths;
-      }
-
-      return swapPaths;
-    },
+    findBestPath,
   };
 }
 
-export async function getAmount(account: HardhatEthersSigner, token: string, ethers: typeof e, wnative: string) {
-  const isNative = isAddressEqual(token, ZeroAddress) || (isAddressEqual(token, wnative) && randomNumber(0, 100) >= 55);
-  const tokenContract = await ethers.getContractAt("ERC20", token);
-  const balance = await (isNative ? ethers.provider.getBalance(account) : tokenContract.balanceOf(account));
+export async function getAmount(
+  account: HardhatEthersSigner,
+  token: string,
+  ethers: typeof e,
+  wNative: string,
+): Promise<{ amount: bigint; isNative: boolean }> {
+  const isNative = isAddressEqual(token, ZeroAddress) || (isAddressEqual(token, wNative) && randomNumber(0, 100) >= 55);
+
+  const balance = isNative
+    ? await ethers.provider.getBalance(account)
+    : await (await ethers.getContractAt("ERC20", token)).balanceOf(account);
+
   const amount =
-    balance <= 10_000n ? (balance * 9n) / 10n : BigInt(Math.floor(Math.random() * +balance.toString())) / 10_000n;
+    balance <= 10_000n
+      ? (balance * 9n) / 10n // Use 90% of balance if small
+      : BigInt(Math.floor(Number(balance) * Math.random())) / 10_000n; // Randomized amount
 
   return { amount, isNative };
 }
@@ -271,7 +267,7 @@ export function computePriceOracleAddr(routerAddress: string) {
 }
 
 export const getRandomItem = <T = any>(array: T[]) => array[getRandomIndex(array)];
-export const getRandomIndex = (array: any[]) => Math.floor((Math.random() * array.length) % array.length);
+export const getRandomIndex = (array: any[]) => Math.floor(Math.random() * array.length);
 
 export const runInErrorBoundry = async (cb: Function, acceptedErrStrings: string[]) => {
   try {
