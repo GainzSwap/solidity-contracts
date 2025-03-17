@@ -227,7 +227,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 	) external onlyCreator(_campaignId) {
 		require(
 			_goal >= 25_000 ether &&
-				_duration >= 60 days &&
+				_duration >= 30 days &&
 				_duration <= 180 days,
 			"Invalid input"
 		);
