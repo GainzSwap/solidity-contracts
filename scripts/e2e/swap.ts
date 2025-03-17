@@ -32,12 +32,13 @@ export default async function swap(hre: HardhatRuntimeEnvironment, accounts: Har
       const RouterFactory = await ethers.getContractFactory("Router", { libraries: RouterLib });
       const referrerId = randomNumber(0, +(await router.totalUsers()).toString());
 
+      const value = isNative ? amountIn : undefined;
       await router
         .connect(tester)
         .registerAndSwap(
           referrerId,
           RouterFactory.interface.encodeFunctionData(router.swapExactTokensForTokens.name, args),
-          { value: isNative ? amountIn : undefined },
+          { value },
         );
 
       console.log("Swapped", tester.address, amountIn, swapPath);
