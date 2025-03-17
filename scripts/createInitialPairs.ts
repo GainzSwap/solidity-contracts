@@ -3,7 +3,7 @@ import { task } from "hardhat/config";
 import { Gainz, Router, Views } from "../typechain-types";
 import { parseEther, ZeroAddress } from "ethers";
 import { createERC20, CreateERC20Type } from "./createERC20";
-import { randomNumber } from "../utilities";
+import { getSwapTokens, randomNumber } from "../utilities";
 import { days } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 
 task("createInitialPairs", "").setAction(async (_, hre) => {
@@ -28,6 +28,22 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
 
   const router = await ethers.getContract<Router>("Router", deployer);
   const wNativeToken = await router.getWrappedNativeToken();
+
+  for (let index = 1; index <= 5; index++) {
+    const { tokenAddress } = await createERC20(
+      { decimals: randomNumber(0, 18).toFixed(0), name: `${index} Token`, symbol: `${index}TK` },
+      hre,
+    );
+    const { selectTokens } = await getSwapTokens(router, ethers);
+    const { tokenIn } = selectTokens();
+    await hre.run("createPair", {
+      tokenA: tokenAddress,
+      amountA: "0.035",
+      tokenB: tokenIn,
+      amountB: "0.0034",
+    });
+  }
+
   const views = await ethers.getContract<Views>("Views", deployer);
 
   const governanceAddress = await router.getGovernance();
@@ -90,6 +106,6 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
 
     const { campaignId } = await governance.pairListing(signer);
 
-    await launchPair.connect(signer).startCampaign(goal, days(+randomNumber(60, 90).toFixed(0)), campaignId);
+    await launchPair.connect(signer).startCampaign(goal, days(+randomNumber(30, 40).toFixed(0)), campaignId);
   }
 });

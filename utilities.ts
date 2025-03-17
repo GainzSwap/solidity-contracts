@@ -97,7 +97,7 @@ async function saveLibraries(libraries: Record<string, string>, contractName: st
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Router } from "./typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { getCreate2Address, keccak256, solidityPackedKeccak256, ZeroAddress } from "ethers";
+import { getAddress, getCreate2Address, keccak256, solidityPackedKeccak256, ZeroAddress } from "ethers";
 
 export async function getDeploymentTxHashFromNetwork(
   hre: HardhatRuntimeEnvironment,
@@ -153,30 +153,112 @@ export function sleep(ms: number) {
 }
 
 export async function getSwapTokens(router: Router, ethers: typeof e) {
-  const pairs = await router.pairs();
-  const swapTokens: string[] = [];
-  const swapTokenPath: Record<string, [string, string]> = {};
+  const pairs: { token0: string; token1: string; address: string }[] = [];
+  const swapTokens: Set<string> = new Set();
 
-  for (const address of pairs) {
+  const joiner = "@";
+  const makePair = ([from, to]: [string, string]) => `${from}${joiner}${to}` as const;
+  const makePath = (pair: string) => pair.split(joiner);
+  const tradePairs: ReturnType<typeof makePair>[] = [];
+
+  for (const address of await router.pairs()) {
     const pair = await ethers.getContractAt("Pair", address);
     const token0 = await pair.token0();
     const token1 = await pair.token1();
 
-    !swapTokens.includes(token0) && swapTokens.push(token0);
-    !swapTokens.includes(token1) && swapTokens.push(token1);
+    swapTokens.add(token0);
+    swapTokens.add(token1);
 
-    swapTokenPath[token0 + token1] = [token1, token0];
-    swapTokenPath[token1 + token0] = [token0, token1];
+    pairs.push({ token0, token1, address });
+
+    tradePairs.push(makePair([token0, token1]), makePair([token1, token0]));
   }
 
-  return { swapTokens, swapTokenPath };
+  const cachedSwapPaths: { [key: string]: string[] | undefined } = {};
+
+  return {
+    swapTokens: Array.from(swapTokens),
+    selectTokens: () => {
+      const tokens = Array.from(swapTokens);
+
+      return { tokenIn: tokens.splice(getRandomIndex(tokens))[0], tokenOut: tokens.splice(getRandomIndex(tokens))[0] };
+    },
+    findBestPath([inToken, outToken]: [string, string], depth = 0) {
+      if (inToken == outToken) {
+        return null;
+      }
+
+      const cacheKey = makePair([inToken, outToken]);
+
+      const cachedSwapPath = cachedSwapPaths[cacheKey];
+      if (cachedSwapPath) {
+        return cachedSwapPath;
+      }
+
+      const pathsBuilder: {
+        complete: string[];
+        fromInBetween: string[][];
+        toInBetween: string[][];
+      } = { complete: [], fromInBetween: [], toInBetween: [] };
+
+      // inclusivePaths
+      for (const pair of tradePairs) {
+        if (!(pair.includes(inToken) || pair.includes(outToken))) {
+          continue;
+        }
+
+        const path = makePath(pair);
+
+        const hasFrom = path[0] === inToken;
+        const hasTo = path.at(-1) === outToken;
+
+        if (hasFrom && hasTo) {
+          pathsBuilder.complete.push(...path);
+        } else if (hasFrom) {
+          pathsBuilder.fromInBetween.push(path);
+        } else if (hasTo) {
+          pathsBuilder.toInBetween.push(path);
+        }
+      }
+
+      while (pathsBuilder.fromInBetween.length > 0 && depth <= 4) {
+        const fromIDxBetween = pathsBuilder.fromInBetween.pop();
+        if (fromIDxBetween?.length) {
+          const last_fromIDxBetween = fromIDxBetween.at(-1)!;
+
+          for (const toIDxBetween of pathsBuilder.toInBetween) {
+            const [first_toIDxBetween] = toIDxBetween;
+            if (first_toIDxBetween == last_fromIDxBetween) {
+              // Glue them
+              pathsBuilder.complete.push(...fromIDxBetween, ...toIDxBetween.slice(1));
+            } else {
+              // Search for intermediates
+              const intermediate_path: [string, string] = [last_fromIDxBetween, first_toIDxBetween];
+              pathsBuilder.complete.push(...(this.findBestPath(intermediate_path, depth + 1) || []));
+            }
+          }
+        }
+      }
+
+      const swapPaths = pathsBuilder.complete;
+
+      if (swapPaths.length) {
+        cachedSwapPaths[cacheKey] = swapPaths;
+      }
+
+      return swapPaths;
+    },
+  };
 }
 
 export async function getAmount(account: HardhatEthersSigner, token: string, ethers: typeof e, wnative: string) {
-  const isNative = token === wnative;
+  const isNative = isAddressEqual(token, ZeroAddress) || (isAddressEqual(token, wnative) && randomNumber(0, 100) >= 55);
   const tokenContract = await ethers.getContractAt("ERC20", token);
   const balance = await (isNative ? ethers.provider.getBalance(account) : tokenContract.balanceOf(account));
-  return BigInt(Math.floor(Math.random() * +balance.toString())) / 10_000n;
+  const amount =
+    balance <= 10_000n ? (balance * 9n) / 10n : BigInt(Math.floor(Math.random() * +balance.toString())) / 10_000n;
+
+  return { amount, isNative };
 }
 
 export function computePriceOracleAddr(routerAddress: string) {
@@ -188,7 +270,8 @@ export function computePriceOracleAddr(routerAddress: string) {
   );
 }
 
-export const getRandomItem = <T = any>(array: T[]) => array[Math.floor((Math.random() * array.length) % array.length)];
+export const getRandomItem = <T = any>(array: T[]) => array[getRandomIndex(array)];
+export const getRandomIndex = (array: any[]) => Math.floor((Math.random() * array.length) % array.length);
 
 export const runInErrorBoundry = async (cb: Function, acceptedErrStrings: string[]) => {
   try {
@@ -201,3 +284,5 @@ export const runInErrorBoundry = async (cb: Function, acceptedErrStrings: string
     console.log(error);
   }
 };
+
+export const isAddressEqual = (a: string, b: string) => getAddress(a) === getAddress(b);

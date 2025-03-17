@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Router } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { parseEther } from "ethers";
 
 export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nFunding Campaign");
@@ -15,6 +16,7 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
   const launchPair = await ethers.getContractAt("LaunchPair", await governance.launchPair());
 
   const campaignIds = await launchPair.getActiveCampaigns();
+  const minContribution = parseEther("1");
 
   for (const campaignId of campaignIds) {
     const { deadline } = await launchPair.getCampaignDetails(campaignId);
@@ -23,8 +25,11 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
     for (const account of accounts) {
       const amount = await ethers.provider.getBalance(account.address).then(bal => {
         const randBal = Math.floor(Math.random() * +bal.toString());
-        return BigInt(randBal) / 100_000n;
+        const amount = BigInt(randBal) / 100_000n;
+
+        return amount < minContribution && bal > minContribution ? minContribution : amount;
       });
+      if (amount < minContribution) continue;
 
       const totalUsers = +(await router.totalUsers()).toString();
       const referrerId = [0, 1, 2, 3, 4, 5][(totalUsers + 1) % 3];

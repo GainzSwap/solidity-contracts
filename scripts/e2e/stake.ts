@@ -1,10 +1,15 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Router, Views } from "../../typechain-types";
-import { getAmount, getRandomItem, getSwapTokens, randomNumber } from "../../utilities";
+import {
+  getAmount,
+  getRandomItem,
+  getSwapTokens,
+  isAddressEqual,
+  randomNumber,
+  runInErrorBoundry,
+} from "../../utilities";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { getAddress, ZeroAddress } from "ethers";
-
-const isAddressEqual = (a: string, b: string) => getAddress(a) === getAddress(b);
 
 export default async function stake(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nStaking");
@@ -33,9 +38,11 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
       continue;
     }
 
-    const amountInA = await getAmount(account, tokenA, ethers, wnative);
+    const { amount: amountInA } = await getAmount(account, tokenA, ethers, wnative);
+    if (amountInA == 0n) continue;
     const amountOutMinA = 1n;
     const amountInB = await views.getQuote(amountInA, [tokenA, tokenB]);
+    if (amountInB == 0n) continue;
     const amountOutMinB = 1n;
 
     for (const [address, amount] of [
@@ -50,16 +57,26 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
     const pathToNative = [tokenA == wnative ? tokenB : tokenA, wnative];
     const value = randomNumber(0, 100) >= 55 ? undefined : aIsWNative ? amountInA : bIsWNative ? amountInB : undefined;
 
-    await governance
-      .connect(account)
-      .stakeLiquidity(
-        { amount: amountInA, token: tokenA, nonce: 0 },
-        { amount: amountInB, token: tokenB, nonce: 0 },
-        randomNumber(0, 1081),
-        [amountOutMinA, amountOutMinB, Number.MAX_SAFE_INTEGER],
-        pathToNative,
-        { value },
-      );
+    const hasEnoughBToken =
+      (await (value
+        ? account.provider.getBalance(account.address)
+        : (await ethers.getContractAt("ERC20", tokenB)).balanceOf(account))) > amountInB;
+    if (!hasEnoughBToken) continue;
+
+    await runInErrorBoundry(
+      () =>
+        governance
+          .connect(account)
+          .stakeLiquidity(
+            { amount: amountInA, token: tokenA, nonce: 0 },
+            { amount: amountInB, token: tokenB, nonce: 0 },
+            randomNumber(0, 1081),
+            [amountOutMinA, amountOutMinB, Number.MAX_SAFE_INTEGER],
+            pathToNative,
+            { value },
+          ),
+      ["AMMLibrary: INSUFFICIENT_AMOUNT"],
+    );
     console.log(account.address, "staked");
   }
 }

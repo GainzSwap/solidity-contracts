@@ -9,11 +9,22 @@ import delegate from "./delegate";
 import unDelegate from "./unDelegate";
 import transferToken from "./transferToken";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { minutes } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
+import { minutes, seconds } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 import unStake from "./unStake";
+import completeCampaign from "./completeCampaign";
 
 task("e2e", "").setAction(async (_, hre) => {
-  const actions = [claimRewards, stake, unStake, swap, transferToken, delegate, unDelegate, fundCampaign];
+  const actions = [
+    completeCampaign,
+    claimRewards,
+    stake,
+    unStake,
+    swap,
+    transferToken,
+    delegate,
+    unDelegate,
+    fundCampaign,
+  ];
   const accounts = await hre.ethers.getSigners();
 
   while (true) {
@@ -41,6 +52,6 @@ task("e2e", "").setAction(async (_, hre) => {
       }),
     );
 
-    await time.increase(minutes(randomNumber(5, 50)));
+    await time.increase(seconds(randomNumber(1, 43_200)));
   }
 });
