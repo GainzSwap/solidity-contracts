@@ -249,10 +249,10 @@ export async function getAmount(
     ? await ethers.provider.getBalance(account)
     : await (await ethers.getContractAt("ERC20", token)).balanceOf(account);
 
-  const amount =
-    balance <= 10_000n
-      ? (balance * 9n) / 10n // Use 90% of balance if small
-      : BigInt(Math.floor(Number(balance) * Math.random())) / 10_000n; // Randomized amount
+  let amount = BigInt(randomNumber(10e5, 100e18));
+  if (amount > balance) {
+    amount = (balance * 9n) / 10n; // Use 90% of balance if small
+  }
 
   return { amount, isNative };
 }
