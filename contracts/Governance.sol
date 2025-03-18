@@ -639,18 +639,16 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 	function updateRewardReserve() external {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
-		LaunchPair.Campaign memory gainzCampaign = $
-			.launchPair
-			.getCampaignDetails(1);
+		// TODO this should be removed once the GainzSwap ILO is progressed to its end
 		TokenListing memory gainzLisitng = $.pairOwnerListing[
-			gainzCampaign.creator
+			$.launchPair.getCampaignDetails(1).creator
 		];
+		require(gainzLisitng.tradeTokenPayment.amount == 0, "TGE not done");
 
-		// Transfer the amount of Gainz tokens to the contract
-		uint256 amount = IERC20($.gainzToken).balanceOf(address(this)) -
-			// TODO this should be removed once the GainzSwap ILO is progressed to its end
-			gainzLisitng.tradeTokenPayment.amount -
-			$.rewardsReserve;
+		uint256 gainzBal = IERC20($.gainzToken).balanceOf(address(this));
+		if (gainzBal < $.rewardsReserve) return;
+
+		uint256 amount = gainzBal - $.rewardsReserve;
 		uint _rewardPerShare;
 
 		uint256 totalStakeWeight = GToken($.gtoken).totalStakeWeight();
