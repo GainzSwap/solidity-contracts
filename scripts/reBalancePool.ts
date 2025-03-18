@@ -62,7 +62,7 @@ task("reBalancePool").setAction(async (_, hre) => {
       usdcShare: formatUnits((userPairLiq * usdcReserve) / totalPairLiq, 6),
     });
 
-    if (ratio <= parseEther("3.631150")) break;
+    if (ratio <= parseEther("5.847880")) break;
 
     // const eduBal = await (await ethers.getContractAt("ERC20", edu)).balanceOf(deployer);
     // eduBal > 0n &&
@@ -72,7 +72,11 @@ task("reBalancePool").setAction(async (_, hre) => {
     //     await (await ethers.getContractAt("ERC20", edu)).balanceOf(deployer),
     //   ));
 
-    const amountIn = (usdcReserve * 4n) / 10_000n;
+    const usdcBal = await (await ethers.getContractAt("ERC20", usdc)).balanceOf(deployer);
+    let amountIn = (usdcReserve * 5n) / 10_000n;
+    if (usdcBal < amountIn) amountIn = usdcBal;
+    if (amountIn <= 0n) break;
+
     const amountOut = (eduReserve * amountIn) / usdcReserve;
 
     const { hash } = await router.swapExactTokensForTokens(

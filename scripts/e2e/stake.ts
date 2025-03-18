@@ -1,7 +1,16 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { Router } from "../../typechain-types";
-import { getAmount, getSwapTokens, randomNumber } from "../../utilities";
+import { Router, Views } from "../../typechain-types";
+import {
+  getAmount,
+  getRandomItem,
+  getSwapTokens,
+  isAddressEqual,
+  randomNumber,
+  runInErrorBoundry,
+} from "../../utilities";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { getAddress, ZeroAddress } from "ethers";
+import { slippageErrors } from "./errors";
 
 export default async function stake(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nStaking");
@@ -10,48 +19,86 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
   const router = await ethers.getContract<Router>("Router", deployer);
   const governance = await ethers.getContractAt("Governance", await router.getGovernance());
   const wnative = await router.getWrappedNativeToken();
+  const views = await ethers.getContract<Views>("Views", deployer);
 
-  const { swapTokens } = await getSwapTokens(router, ethers);
+  const { tradePairs, makePath, findBestPath } = await getSwapTokens(router, ethers);
 
   for (const account of accounts) {
-    if (swapTokens.length < 2) continue;
-    const [tokenA, tokenB] = [
-      swapTokens.splice(randomNumber(0, swapTokens.length), 1)[0],
-      swapTokens.splice(randomNumber(0, swapTokens.length), 1)[0],
-    ];
+    const [tokenA, tokenB] = makePath(getRandomItem(tradePairs));
+    const aIsWNative = isAddressEqual(tokenA, wnative);
+    const bIsWNative = isAddressEqual(tokenB, wnative);
 
-    const amount = await getAmount(account, tokenA, ethers, wnative);
-    console.log(`Staking ${ethers.formatEther(amount)}`);
-
-    const amountInA = (BigInt(randomNumber(25, 70).toFixed(0)) * amount) / 100n;
-    const amountOutMinA = 1n;
-    const amountInB = amount - amountInA;
-    const amountOutMinB = 1n;
-
-    const value = tokenA == wnative && randomNumber(0, 100) <= 55 ? amount : undefined;
-    if (!value) {
-      const token0 = await ethers.getContractAt("ERC20", tokenA);
-      await token0.connect(account).approve(governance, amount);
+    const pathToNative = aIsWNative
+      ? [tokenB, tokenA]
+      : bIsWNative
+        ? [tokenA, tokenB]
+        : findBestPath([tokenA, wnative]) || findBestPath([tokenB, wnative]);
+    if (!pathToNative?.length) {
+      console.log("No path to native for ", tokenA, tokenB);
+      continue;
     }
 
-    const pathA = [tokenA];
-    const pathB = [tokenA, tokenB];
-    const pathToNative = pathA[0] == wnative ? pathB.reverse() : [tokenA, wnative];
+    const slippage = BigInt(randomNumber(1, 100).toFixed());
+    const _100Percent = 1000n;
+    const applySlippage = (amount: bigint) => (amount * _100Percent) / (_100Percent - slippage);
 
-    try {
-      const { data } = await governance.connect(account).stake(
-        { amount, token: pathA[0], nonce: 0 },
-        randomNumber(0, 1081),
-        [pathA, pathB, pathToNative],
-        [
-          [amountInA, amountOutMinA],
-          [amountInB, amountOutMinB],
-        ],
-        Number.MAX_SAFE_INTEGER,
-        { value },
-      );
-    } catch (error) {
-      console.error(error);
+    const { amount: amountInA } = await getAmount(account, tokenA, ethers, wnative);
+    if (amountInA == 0n) continue;
+    const amountOutMinA = applySlippage(amountInA);
+    const amountInB = await views.getQuote(amountInA, [tokenA, tokenB]);
+    if (amountInB == 0n) continue;
+    const amountOutMinB = applySlippage(amountInB);
+
+    if (amountOutMinA < 1n || amountOutMinB < 1n) continue;
+
+    console.log(account.address, "Staking", { tokenA, tokenB });
+
+    for (const [address, amount] of [
+      [tokenA, amountInA],
+      [tokenB, amountInB],
+    ] as const) {
+      if (isAddressEqual(address, ZeroAddress)) continue;
+      const token = await ethers.getContractAt("ERC20", address);
+      await token.connect(account).approve(governance, 2n ** 251n);
     }
+
+    const value = randomNumber(0, 100) >= 55 ? undefined : aIsWNative ? amountInA : bIsWNative ? amountInB : undefined;
+
+    const bTokenBal = await (value && bIsWNative
+      ? ethers.provider.getBalance(account.address)
+      : (await ethers.getContractAt("ERC20", tokenB)).balanceOf(account));
+    if (bTokenBal < amountInB) {
+      try {
+        await router
+          .connect(account)
+          .swapExactTokensForTokens(
+            amountInA,
+            amountInB,
+            findBestPath([tokenA, tokenB])!,
+            account,
+            Number.MAX_SAFE_INTEGER,
+          );
+      } catch (error) {
+        // console.log(error);
+        console.log("Failed to stake due to b amount", account.address);
+        return;
+      }
+    }
+
+    await runInErrorBoundry(
+      () =>
+        governance
+          .connect(account)
+          .stakeLiquidity(
+            { amount: amountInA, token: tokenA, nonce: 0 },
+            { amount: amountInB, token: tokenB, nonce: 0 },
+            randomNumber(0, 1081),
+            [amountOutMinA, amountOutMinB, Number.MAX_SAFE_INTEGER],
+            pathToNative,
+            { value },
+          ),
+      [...slippageErrors],
+    );
+    console.log(account.address, "staked");
   }
 }

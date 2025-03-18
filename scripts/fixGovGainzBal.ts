@@ -12,8 +12,13 @@ task("fixGovGainzBal", "").setAction(async (_, hre) => {
 
   const gainz = await ethers.getContract<Gainz>("Gainz", deployer);
 
-  const { tradeTokenPayment } = await governance.pairListing(deployer);
-  const govbalIsLow = async () => (await gainz.balanceOf(governance)) < tradeTokenPayment.amount;
+  let amount = 0n;
+  try {
+    const { tradeTokenPayment } = await governance.pairListing(deployer);
+    amount = tradeTokenPayment.amount;
+  } catch (error) {}
+  amount < 1n && (amount = 3702349199034132347904207n);
+  const govbalIsLow = async () => (await gainz.balanceOf(governance)) < amount;
 
   const signers = await ethers.getSigners();
 
@@ -24,4 +29,6 @@ task("fixGovGainzBal", "").setAction(async (_, hre) => {
       await gainz.connect(signer).transfer(governance, bal);
     }
   }
+
+  await governance.updateRewardReserve();
 });

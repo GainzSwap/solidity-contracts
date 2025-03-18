@@ -31,7 +31,8 @@ library GTokenLib {
 	/// @param self The Attributes struct of the participant.
 	/// @return The updated Attributes struct with the computed stake weight.
 	function computeStakeWeight(
-		Attributes memory self
+		Attributes memory self,
+		uint256 curentEpoch
 	) internal pure returns (Attributes memory) {
 		uint256 epochsLocked = self.epochsLocked;
 		require(
@@ -47,7 +48,7 @@ library GTokenLib {
 		}
 
 		// Calculate stake weight based on supply and epochs locked
-		self.stakeWeight = liqValue * epochsLocked;
+		self.stakeWeight = liqValue * (1 + epochsLeft(self, curentEpoch));
 
 		return self;
 	}

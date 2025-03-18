@@ -12,42 +12,42 @@ contract GainzTest is Test, RouterFixture {
 		governance = Governance(payable(router.getGovernance()));
 	}
 
-	string[] public fixtureEntity = ["team", "growth", "liqIncentive"];
-
-	function testFuzz_mintGainz(
-		string memory entity,
-		uint256 timestamp,
-		address entityAddress
-	) public {
+	function testFuzz_mintGainz() public {
 		gainz.runInit(address(governance));
 
 		// Arrange
-		vm.assume(timestamp > 0 && timestamp < 360 days); // Ensure a realistic range
-		vm.warp(timestamp);
+		vm.warp(360 days);
 
 		// Act
 		uint256 emittedGainz = gainz.stakersGainzToEmit();
 		gainz.mintGainz();
 
 		// Assert
-		uint256 governanceBalance = gainz.balanceOf(address(governance));
-		assertEq(
-			governanceBalance,
-			emittedGainz,
-			"Governance should receive all emitted gainz"
-		);
+		string[3] memory fixtureEntity = ["team", "growth", "liqIncentive"];
+		for (uint256 i = 0; i < fixtureEntity.length; i++) {
+			string memory entity = fixtureEntity[i];
+			address entityAddress = makeAddr(entity);
 
-		uint256 entityAmount = gainz.sendGainz(entityAddress, entity);
-		assertEq(
-			gainz.sendGainz(entityAddress, entity),
-			0,
-			"Subsequent SendGainz Call in the same timestamp should return zero"
-		);
-		assertEq(
-			entityAmount,
-			gainz.balanceOf(entityAddress),
-			"Entity Address should receive the gainz"
-		);
+			uint256 governanceBalance = gainz.balanceOf(address(governance));
+			assertEq(
+				governanceBalance,
+				emittedGainz,
+				"Governance should receive all emitted gainz"
+			);
+
+			uint256 entityAmount = gainz.sendGainz(entityAddress, entity);
+			assert(entityAmount > 0);
+			assertEq(
+				gainz.sendGainz(entityAddress, entity),
+				0,
+				"Subsequent SendGainz Call in the same timestamp should return zero"
+			);
+			assertEq(
+				entityAmount,
+				gainz.balanceOf(entityAddress),
+				"Entity Address should receive the gainz"
+			);
+		}
 	}
 
 	function testRunInitRevertsInvalidAddress() public {

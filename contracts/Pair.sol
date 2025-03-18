@@ -21,8 +21,8 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 	uint constant MINIMUM_LIQUIDITY = 10 ** 3;
 
 	uint constant FEE_BASIS_POINTS = 100_00; // 100%
-	uint constant MINIMUM_FEE = 5; // 0.05%
-	uint constant MAXIMUM_FEE = 65; // 0.65%
+	uint constant MINIMUM_FEE = 35; // 0.35%
+	uint constant MAXIMUM_FEE = 120; // 1.20%
 
 	bytes4 private constant SELECTOR =
 		bytes4(keccak256(bytes("transfer(address,uint256)")));
@@ -335,8 +335,8 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		uint256 reserveGap = (reserve == reserve0 && reserve0 > reserve1)
 			? reserve0 - reserve1
 			: (reserve == reserve1 && reserve1 > reserve0)
-			? reserve1 - reserve0
-			: 0;
+				? reserve1 - reserve0
+				: 0;
 
 		uint256 totalLiquidity = totalSupply();
 		// - balanceOf(ISwapFactory(_getPairStorage().router).feeTo());
@@ -355,8 +355,8 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 		PairStorage storage $ = _getPairStorage();
 
 		return (
-			$.minFee == 0 ? MINIMUM_FEE : $.minFee,
-			$.maxFee == 0 ? MAXIMUM_FEE : $.maxFee
+			$.minFee < MINIMUM_FEE ? MINIMUM_FEE : $.minFee,
+			$.maxFee < MAXIMUM_FEE ? MAXIMUM_FEE : $.maxFee
 		);
 	}
 }

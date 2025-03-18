@@ -227,7 +227,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 	) external onlyCreator(_campaignId) {
 		require(
 			_goal >= 25_000 ether &&
-				_duration >= 7 days &&
+				_duration >= 30 days &&
 				_duration <= 180 days,
 			"Invalid input"
 		);
@@ -261,7 +261,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		uint256 referrerId
 	) external payable campaignExists(_campaignId) isNotExpired(_campaignId) {
 		require(msg.value >= 1 ether, "Minimum contribution is 1 $EDU");
-		
+
 		MainStorage storage $ = _getMainStorage();
 
 		Router router = Router(
@@ -439,6 +439,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 
 		// Update the status to Failed
 		campaign.status = CampaignStatus.Failed;
+		$.activeCampaigns.remove(_campaignId);
 
 		payable(msg.sender).transfer(amount);
 

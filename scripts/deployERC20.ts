@@ -8,13 +8,14 @@ dotenv.config();
 
 task("deployERC20", "")
   .addParam("name", "name")
+  .addParam("decimals", "decimals")
   .addParam("symbol", "The ticker symbol")
-  .setAction(async ({ name, symbol }, hre) => {
+  .setAction(async ({ name, symbol, decimals }, hre) => {
     if (hre.network.name !== "localhost") throw "This deploys only TestERC20";
 
     const factory = await hre.ethers.getContractFactory("TestERC20");
 
-    const token = await factory.deploy(name, symbol, 18);
+    const token = await factory.deploy(name, symbol, decimals);
     await token.waitForDeployment();
     const tokenAddress = await token.getAddress();
 

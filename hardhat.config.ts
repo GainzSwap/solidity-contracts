@@ -26,6 +26,9 @@ import "./scripts/refund";
 import "./scripts/createHDWallet";
 import "./scripts/settleWithdrawals";
 import "./scripts/reBalancePool";
+import "./scripts/semOnePoints";
+import "./scripts/createERC20";
+import "./scripts/listGainz";
 import "./scripts/fixGovGainzBal";
 
 // If not set, it uses the hardhat account 0 private key.

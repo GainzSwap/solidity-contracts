@@ -11,12 +11,34 @@ task("settleWithdrawals").setAction(async (_, hre) => {
 
   const feeTo = await ethers.getSigner(newFeeTo);
 
+  const WEDU = "0xd02E8c38a8E3db71f8b2ae30B8186d7874934e12";
+  const wedu = await ethers.getContractAt("WNTV", WEDU);
+  // {
+  //   const reBalancePoolEDUAmt = await wNative.balanceOf(deployer);
+  //   if (reBalancePoolEDUAmt <= 0n) return;
+
+  //   await wNative.transfer(feeTo, reBalancePoolEDUAmt);
+
+  //   // await wedu.connect(feeTo).withdraw(reBalancePoolEDUAmt);
+
+  //   const { hash } = await feeTo.sendTransaction({
+  //     value: reBalancePoolEDUAmt,
+  //     to: "0x8D0739d9D0d49aFCF8d101416cD2759Bf8922013",
+  //   });
+
+  //   console.log("reBalancePoolEDUAmt hash", hash);
+
+  //   return;
+  // }
+
   {
     const pendingWithdrawal = await wNative.pendingWithdrawals();
     const balance = await ethers.provider.getBalance(feeTo);
     console.log({ pendingWithdrawal: formatEther(pendingWithdrawal) });
     if (pendingWithdrawal > 0n) {
-      if (balance < pendingWithdrawal) throw new Error("Insufficient Balance For settleWithdrawals");
+      if (balance < pendingWithdrawal) {
+        await wedu.connect(feeTo).withdraw(pendingWithdrawal);
+      }
       await wNative.connect(feeTo).settleWithdrawals({ value: pendingWithdrawal });
     }
   }
@@ -26,9 +48,9 @@ task("settleWithdrawals").setAction(async (_, hre) => {
     if (amountToStake > 0n) {
       const tx = await feeTo.sendTransaction({
         value: amountToStake,
-        to: "0xd02E8c38a8E3db71f8b2ae30B8186d7874934e12",
+        to: WEDU,
       });
-      console.log("Stake hash",tx.hash);
+      console.log("Stake hash", tx.hash);
     }
   }
 });

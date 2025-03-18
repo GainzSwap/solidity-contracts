@@ -86,7 +86,7 @@ contract GToken is SFT {
 				stakeWeight: 0,
 				lpDetails: lpDetails
 			})
-			.computeStakeWeight();
+			.computeStakeWeight(currentEpoch);
 
 		// Mint the GToken with the specified attributes and return the token ID
 		return _mint(to, attributes.supply(), abi.encode(attributes));
@@ -105,7 +105,9 @@ contract GToken is SFT {
 		uint256 nonce,
 		GTokenLib.Attributes memory attr
 	) external canUpdate returns (uint256) {
-		attr = attr.computeStakeWeight();
+		attr = attr.computeStakeWeight(
+			_getGTokenStorage().epochs.currentEpoch()
+		);
 		return super.update(user, nonce, attr.supply(), abi.encode(attr));
 	}
 

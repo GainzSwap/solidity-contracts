@@ -28,11 +28,13 @@ contract GTokenLibFuzzTest is Test {
 			epochsLocked
 		);
 		attributes.lpDetails.liquidity = liqValue;
-		attributes = attributes.computeStakeWeight();
+
+		uint256 currentEpoch = 5;
+		attributes = attributes.computeStakeWeight(currentEpoch);
 
 		assertEq(
 			attributes.stakeWeight,
-			liqValue * epochsLocked,
+			liqValue * (1 + attributes.epochsLeft(currentEpoch)),
 			"Incorrect stake weight"
 		);
 	}

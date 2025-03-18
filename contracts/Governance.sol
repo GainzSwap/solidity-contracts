@@ -60,7 +60,7 @@ library GovernanceLib {
 			.attributes;
 
 		require(
-			attributes.epochsLeft(currentEpoch) >= 1000,
+			attributes.epochsLeft(currentEpoch) >= 1079,
 			"Security GToken Payment Expired"
 		);
 
@@ -72,7 +72,7 @@ library GovernanceLib {
 
 	function _calculateClaimableReward(
 		address user,
-		uint256 nonce,
+		uint256[] memory nonces,
 		address gtoken,
 		uint256 rewardPerShare
 	)
@@ -80,33 +80,39 @@ library GovernanceLib {
 		view
 		returns (
 			uint256 claimableReward,
-			GTokenLib.Attributes memory attributes
+			GTokenLib.Attributes[] memory attributes
 		)
 	{
-		attributes = GToken(gtoken).getBalanceAt(user, nonce).attributes;
+		attributes = new GTokenLib.Attributes[](nonces.length);
 
-		claimableReward = FullMath.mulDiv(
-			attributes.stakeWeight,
-			rewardPerShare - attributes.rewardPerShare,
-			FixedPoint128.Q128
-		);
+		for (uint256 i = 0; i < nonces.length; i++) {
+			attributes[i] = GToken(gtoken)
+				.getBalanceAt(user, nonces[i])
+				.attributes;
+
+			claimableReward += FullMath.mulDiv(
+				attributes[i].stakeWeight,
+				rewardPerShare - attributes[i].rewardPerShare,
+				FixedPoint128.Q128
+			);
+		}
 	}
 
 	function _claimRewards(
 		Governance.GovernanceStorage storage $,
 		address user,
-		uint256 nonce
+		uint256[] memory nonces
 	)
 		internal
 		returns (
 			uint256 claimableReward,
-			GTokenLib.Attributes memory attributes
+			GTokenLib.Attributes[] memory attributes
 		)
 	{
 		// Calculate rewards to be claimed on unstaking
 		(claimableReward, attributes) = _calculateClaimableReward(
 			user,
-			nonce,
+			nonces,
 			$.gtoken,
 			$.rewardPerShare
 		);
@@ -127,20 +133,23 @@ library GovernanceLib {
 		Gainz($.gainzToken).mintGainz();
 
 		address user = msg.sender;
-		(, GTokenLib.Attributes memory attributes) = _claimRewards(
+		uint256[] memory nonces = new uint256[](1);
+		nonces[0] = nonce;
+		(, GTokenLib.Attributes[] memory attributes) = _claimRewards(
 			$,
 			user,
-			nonce
+			nonces
 		);
+		GTokenLib.Attributes memory attribute = attributes[0];
 
-		GToken($.gtoken).burn(user, nonce, attributes.supply());
+		GToken($.gtoken).burn(user, nonce, attribute.supply());
 
-		uint256 liquidity = attributes.lpDetails.liquidity;
-		uint256 liquidityToReturn = attributes.epochsLocked == 0
+		uint256 liquidity = attribute.lpDetails.liquidity;
+		uint256 liquidityToReturn = attribute.epochsLocked == 0
 			? liquidity
-			: attributes.valueToKeep(liquidity, $.epochs.currentEpoch());
+			: attribute.valueToKeep(liquidity, $.epochs.currentEpoch());
 		if (liquidityToReturn < liquidity) {
-			$.pairLiqFee[attributes.lpDetails.pair] +=
+			$.pairLiqFee[attribute.lpDetails.pair] +=
 				liquidity -
 				liquidityToReturn;
 
@@ -149,8 +158,8 @@ library GovernanceLib {
 			amount1Min = (amount1Min * liquidityToReturn) / liquidity;
 		}
 
-		address token0 = attributes.lpDetails.token0;
-		address token1 = attributes.lpDetails.token1;
+		address token0 = attribute.lpDetails.token0;
+		address token1 = attribute.lpDetails.token1;
 
 		Pair(
 			PriceOracle(OracleLibrary.oracleAddress($.router)).pairFor(
@@ -630,9 +639,17 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 	function updateRewardReserve() external {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
-		// Transfer the amount of Gainz tokens to the contract
-		uint256 amount = IERC20($.gainzToken).balanceOf(address(this)) -
-			$.rewardsReserve;
+		// TODO this should be removed once the GainzSwap ILO is progressed to its end
+		TokenListing memory gainzListing = $.pairOwnerListing[
+			$.launchPair.getCampaignDetails(1).creator
+		];
+		if (gainzListing.campaignId == 1)
+			require(gainzListing.tradeTokenPayment.amount == 0, "TGE not done");
+
+		uint256 gainzBal = IERC20($.gainzToken).balanceOf(address(this));
+		if (gainzBal < $.rewardsReserve) return;
+
+		uint256 amount = gainzBal - $.rewardsReserve;
 		uint _rewardPerShare;
 
 		uint256 totalStakeWeight = GToken($.gtoken).totalStakeWeight();
@@ -647,23 +664,50 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 	/// 	 update the user's reward attributes, and decrease the rewards reserve.
 	/// @param nonce The specific nonce representing a unique staking position of the user.
 	/// @return Nonce of the updated GToken for the user after claiming the reward.
-	function claimRewards(uint256 nonce) external returns (uint256) {
+	function claimReward(uint256 nonce) external returns (uint256) {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
 		Gainz($.gainzToken).mintGainz();
 
 		address user = msg.sender;
+		uint256[] memory nonces = new uint256[](1);
+		nonces[0] = nonce;
 		(
 			uint256 claimableReward,
-			GTokenLib.Attributes memory attributes
-		) = GovernanceLib._claimRewards($, user, nonce);
+			GTokenLib.Attributes[] memory attributes
+		) = GovernanceLib._claimRewards($, user, nonces);
 
 		require(claimableReward > 0, "Governance: No rewards to claim");
 
-		attributes.rewardPerShare = $.rewardPerShare;
-		attributes.lastClaimEpoch = $.epochs.currentEpoch();
+		GTokenLib.Attributes memory attribute = attributes[0];
 
-		return GToken($.gtoken).update(user, nonce, attributes);
+		attribute.rewardPerShare = $.rewardPerShare;
+		attribute.lastClaimEpoch = $.epochs.currentEpoch();
+
+		return GToken($.gtoken).update(user, nonce, attribute);
+	}
+
+	function claimRewards(
+		uint256[] memory nonces
+	) external returns (uint256[] memory) {
+		GovernanceStorage storage $ = _getGovernanceStorage();
+
+		Gainz($.gainzToken).mintGainz();
+
+		address user = msg.sender;
+		(, GTokenLib.Attributes[] memory attributes) = GovernanceLib
+			._claimRewards($, user, nonces);
+
+		for (uint256 i = 0; i < nonces.length; i++) {
+			GTokenLib.Attributes memory attribute = attributes[i];
+
+			attribute.rewardPerShare = $.rewardPerShare;
+			attribute.lastClaimEpoch = $.epochs.currentEpoch();
+
+			nonces[i] = GToken($.gtoken).update(user, nonces[i], attribute);
+		}
+
+		return nonces;
 	}
 
 	function unStake(uint256 nonce, uint amount0Min, uint amount1Min) external {
@@ -819,7 +863,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 	function getClaimableRewards(
 		address user,
-		uint256 nonce
+		uint256[] calldata nonces
 	) external view returns (uint256 totalClaimable) {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
@@ -830,7 +874,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 		(totalClaimable, ) = GovernanceLib._calculateClaimableReward(
 			user,
-			nonce,
+			nonces,
 			$.gtoken,
 			$.rewardPerShare + rpsToAdd
 		);

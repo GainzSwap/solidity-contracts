@@ -1,17 +1,22 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
-import { Router } from "../typechain-types";
-import { getGovernanceLibraries } from "../utilities";
+import { Gainz, Router } from "../typechain-types";
+import { computePriceOracleAddr, getGovernanceLibraries, getRouterLibraries, sleep } from "../utilities";
+import { ZeroAddress } from "ethers";
 
 task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   const { deployer } = await hre.getNamedAccounts();
   const deployerSigner = await hre.ethers.getSigner(deployer);
 
   const router = await hre.ethers.getContract<Router>("Router", deployer);
+  const gainz = await hre.ethers.getContract<Gainz>("Gainz", deployer);
 
   const routerAddress = await router.getAddress();
-  const govAddress = await router.getGovernance();
+  const gainzAddress = await gainz.getAddress();
+  const pairBeaconAddress = await router.getPairsBeacon();
+  const wntvAddr = await router.getWrappedNativeToken();
 
+  const govAddress = await router.getGovernance();
   const governance = await hre.ethers.getContractAt("Governance", govAddress);
 
   const gTokenAddress = await governance.getGToken();
@@ -20,27 +25,60 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   console.log("Starting Upgrades");
   await hre.run("compile");
 
-  const isLocalnet = hre.network.name == "localhost";
+  // Gainz
+  console.log("Upgrading Gainz");
+  await hre.upgrades.forceImport(
+    gainzAddress,
+    await hre.ethers.getContractFactory("Gainz", { signer: deployerSigner }),
+  );
+  const newGainz = await hre.upgrades.upgradeProxy(
+    gainzAddress,
+    await hre.ethers.getContractFactory("Gainz", { signer: deployerSigner }),
+    {
+      redeployImplementation: "always",
+    },
+  );
+  console.log("Gainz upgraded successfully.");
+
+  // WNTV
+  console.log("Upgrading WNTV");
+  await hre.upgrades.forceImport(wntvAddr, await hre.ethers.getContractFactory("WNTV", { signer: deployerSigner }));
+  const newWntv = await hre.upgrades.upgradeProxy(
+    wntvAddr,
+    await hre.ethers.getContractFactory("WNTV", { signer: deployerSigner }),
+    {
+      redeployImplementation: "always",
+    },
+  );
+  console.log("WNTV upgraded successfully.");
 
   // Libraries
-  const govLibs = isLocalnet
-    ? await getGovernanceLibraries(hre.ethers)
-    : {
-        DeployLaunchPair: "0x8d44C2133e768218990a427A60054353a58bb098",
-        GovernanceLib: "0x5e53A42854180aa129fD1fC4ED5DB099692F9873",
-        DeployGToken: "0xe023Cd85a42AEa666DE135a215cd5112d7960d18",
-        OracleLibrary: "0xD318a96E32d3Ba5d2A911CaC02053Cb8Eb9484c8",
-      };
+  console.log("Deploying Libraries");
+  const govLibs = await getGovernanceLibraries(hre.ethers);
+  const { routerLibs, AMMLibrary } = await getRouterLibraries(hre.ethers, govLibs);
 
   const Views = await hre.ethers.getContractFactory("Views", {
     libraries: {
-      AMMLibrary: isLocalnet
-        ? await (await hre.ethers.deployContract("AMMLibrary")).getAddress()
-        : "0x2e6E165027Cbaad5A36FdeF77ee7B00A36EADe3D",
+      AMMLibrary,
     },
   });
   const views = await Views.deploy(routerAddress, await router.getPairsBeacon());
   await views.waitForDeployment();
+
+  // Router
+  console.log("Upgrading Router");
+  const newRouter = await hre.upgrades.upgradeProxy(
+    routerAddress,
+    await hre.ethers.getContractFactory("Router", { libraries: routerLibs, signer: deployerSigner }),
+    { redeployImplementation: "always", unsafeAllowLinkedLibraries: true },
+  );
+  console.log("Setting PriceOracle");
+  try {
+    await newRouter.setPriceOracle();
+  } catch (error) {
+    console.log("failed to set price oracle", { error });
+  }
+  console.log("Router upgraded successfully.");
 
   // Governance
   console.log("Upgrading Governance");
@@ -61,21 +99,13 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
     gTokenAddress,
     await hre.ethers.getContractFactory("GToken", { signer: deployerSigner }),
   );
-  const newGToken = await hre.upgrades.upgradeProxy(
+  await hre.upgrades.upgradeProxy(
     gTokenAddress,
     await hre.ethers.getContractFactory("GToken", { signer: deployerSigner }),
     {
       redeployImplementation: "always",
     },
   );
-
-  try {
-    const uriPath = "/api/gToken/{id}.json" as const;
-    const uri = (isLocalnet ? "http://localhost:3000" : "https://gainzswap.xyz") + uriPath;
-    await newGToken.setURI(uri);
-  } catch (error) {
-    console.log(error);
-  }
   console.log("GToken upgraded successfully.");
 
   console.log("Upgrading LaunchPair");
@@ -92,9 +122,36 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   );
   console.log("LaunchPair upgraded successfully.");
 
+  // Get contract factories for the new implementations
+  const pairFactory = async () => hre.ethers.getContractFactory("Pair", { signer: deployerSigner });
+  console.log("Force importing Pair beacon...");
+  const pairBeacon = await hre.upgrades.forceImport(pairBeaconAddress, await pairFactory());
+  // Upgrade the Beacon with the new implementation of Pair
+  console.log("Upgrading Pair beacon...");
+  await hre.upgrades.upgradeBeacon(pairBeacon, await pairFactory(), { redeployImplementation: "always" });
+  console.log("Pair beacon upgraded successfully.");
+
+  console.log("\nSaving artifacts");
+
+  const oracleAddr = computePriceOracleAddr(routerAddress);
+  const priceOracle = await hre.ethers.getContractAt("PriceOracle", oracleAddr);
+
+  console.log("Adding Pairs to Oracle");
+  await sleep(5_000);
+  const pairs = await router.pairs();
+  for (const pair of pairs) {
+    await priceOracle.addPair(pair);
+    console.log("Added", { pair, oracleAddr });
+  }
+
   for (const [contract, address] of [
+    ["Gainz", gainzAddress],
+    ["WNTV", wntvAddr],
+    ["Router", routerAddress],
     ["GToken", gTokenAddress],
     ["LaunchPair", launchPairAddress],
+    ["Pair", ZeroAddress],
+    ["PriceOracle", oracleAddr],
     ["Governance", govAddress],
     ["Views", await views.getAddress()],
   ]) {

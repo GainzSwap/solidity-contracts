@@ -37,7 +37,7 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 
 		gainz.approve(address(router), paymentA.amount);
 
-		(pairAddress, )=router.createPair(paymentA, paymentB);
+		(pairAddress, ) = router.createPair(paymentA, paymentB);
 
 		wNative.receiveFor{ value: 50 ether }(address(this));
 	}
@@ -48,20 +48,20 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 		uint256 epochsLocked,
 		bool stakeGainz
 	) public {
-		amount = bound(amount,25_00,50_00);
-		amountARatio = bound(amountARatio,25_00,50_00);
-		
+		amount = bound(amount, 25_00, 50_00);
+		amountARatio = bound(amountARatio, 25_00, 50_00);
+
 		TokenPayment memory payment = TokenPayment({
 			nonce: 0,
-			amount:amount,
+			amount: amount,
 			token: stakeGainz ? address(gainz) : address(wNative)
 		});
 		vm.assume(
 			1e-15 ether <= payment.amount &&
-			payment.amount <= IERC20(payment.token).balanceOf(pairAddress)
+				payment.amount <= IERC20(payment.token).balanceOf(pairAddress)
 		);
-	uint256	amountInA = amount * amountARatio /100_000;
-	uint256 amountInB= amount - amountInA;
+		uint256 amountInA = (amount * amountARatio) / 100_000;
+		uint256 amountInB = amount - amountInA;
 
 		epochsLocked = bound(
 			epochsLocked,
@@ -70,7 +70,7 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 		);
 
 		address[][3] memory paths;
-		uint256 [2][2] memory path_AB_amounts;
+		uint256[2][2] memory path_AB_amounts;
 
 		path_AB_amounts[0][0] = amountInA;
 		path_AB_amounts[0][1] = 1;
@@ -99,63 +99,61 @@ contract GovernanceTest is Test, ERC1155Holder, RouterFixture {
 			epochsLocked,
 			paths,
 			path_AB_amounts,
-			block.timestamp+1
+			block.timestamp + 1
 		);
 		governance.unStake(1, 1, 1);
 	}
 
-
-    function testFuzz_stakeLiquidity(
-        uint256 amountA,
-        uint256 amountB,
-        uint256 epochsLocked,
-        bool nativePay
-    ) public {
+	function testFuzz_stakeLiquidity(
+		uint256 amountA,
+		uint256 amountB,
+		uint256 epochsLocked,
+		bool nativePay
+	) public {
 		vm.assume(
 			1e-15 ether <= amountA &&
-			amountA <=  wNative.balanceOf(address(this))
+				amountA <= wNative.balanceOf(address(this))
 		);
 		vm.assume(
-			1e-15 ether <= amountB &&
-			amountB <= gainz.balanceOf(address(this))
+			1e-15 ether <= amountB && amountB <= gainz.balanceOf(address(this))
 		);
 
-        TokenPayment memory paymentA = TokenPayment({
-            nonce: 0,
-            amount: amountA,
-            token: address(wNative)
-        });
-        TokenPayment memory paymentB = TokenPayment({
-            nonce: 0,
-            amount: amountB,
-            token: address(gainz)
-        });
+		TokenPayment memory paymentA = TokenPayment({
+			nonce: 0,
+			amount: amountA,
+			token: address(wNative)
+		});
+		TokenPayment memory paymentB = TokenPayment({
+			nonce: 0,
+			amount: amountB,
+			token: address(gainz)
+		});
 
-        epochsLocked = bound(
-            epochsLocked,
-            GTokenLib.MIN_EPOCHS_LOCK,
-            GTokenLib.MAX_EPOCHS_LOCK
-        );
+		epochsLocked = bound(
+			epochsLocked,
+			GTokenLib.MIN_EPOCHS_LOCK,
+			GTokenLib.MAX_EPOCHS_LOCK
+		);
 
-        address[] memory pathToNative = new address[](2);
-        pathToNative[0] = paymentB.token;
-        pathToNative[1] = address(wNative);
+		address[] memory pathToNative = new address[](2);
+		pathToNative[0] = paymentB.token;
+		pathToNative[1] = address(wNative);
 
-        IERC20(paymentA.token).approve(address(governance), paymentA.amount);
-        IERC20(paymentB.token).approve(address(governance), paymentB.amount);
+		IERC20(paymentA.token).approve(address(governance), paymentA.amount);
+		IERC20(paymentB.token).approve(address(governance), paymentB.amount);
 
-        vm.warp(block.timestamp + 20 minutes);
-        governance.stakeLiquidity{ value: !nativePay ? 0 : paymentA.amount }(
-            paymentA,
-            paymentB,
-            epochsLocked,
-            [
+		vm.warp(block.timestamp + 20 minutes);
+		governance.stakeLiquidity{ value: !nativePay ? 0 : paymentA.amount }(
+			paymentA,
+			paymentB,
+			epochsLocked,
+			[
 				1, // amountAMin
 				1, // amountBMin
 				block.timestamp + 1 // deadline
 			],
-            pathToNative
-        );
+			pathToNative
+		);
 		governance.unStake(1, 1, 1);
-    }
+	}
 }

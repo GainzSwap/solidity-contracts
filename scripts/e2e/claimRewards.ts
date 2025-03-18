@@ -1,6 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { GToken, Router } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { getRandomItem } from "../../utilities";
 
 export default async function claimRewards(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nClaim Rewards");
@@ -15,13 +16,14 @@ export default async function claimRewards(hre: HardhatRuntimeEnvironment, accou
   const governance = await ethers.getContractAt("Governance", await router.getGovernance());
 
   for (const account of accounts) {
+    const [...nonces] = await gToken.getNonces(account);
+    if (!nonces.length) continue;
+
     try {
-      const gTokens = await gToken.getGTokenBalance(account);
-      for (const { nonce } of gTokens) {
-        await governance.connect(account).claimRewards(nonce);
-      }
-    } catch (error) {
-      console.log(error);
+      await governance.connect(account).claimRewards(nonces);
+    } catch (error: any) {
+      if (!["No GToken balance found at nonce for user"].some(errString => error.toString().includes(errString)))
+        throw error;
     }
   }
 }
