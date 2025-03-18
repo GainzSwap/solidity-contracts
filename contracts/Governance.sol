@@ -640,10 +640,11 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
 		// TODO this should be removed once the GainzSwap ILO is progressed to its end
-		TokenListing memory gainzLisitng = $.pairOwnerListing[
+		TokenListing memory gainzListing = $.pairOwnerListing[
 			$.launchPair.getCampaignDetails(1).creator
 		];
-		require(gainzLisitng.tradeTokenPayment.amount == 0, "TGE not done");
+		if (gainzListing.campaignId == 1)
+			require(gainzListing.tradeTokenPayment.amount == 0, "TGE not done");
 
 		uint256 gainzBal = IERC20($.gainzToken).balanceOf(address(this));
 		if (gainzBal < $.rewardsReserve) return;
