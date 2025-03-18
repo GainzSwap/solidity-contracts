@@ -52,6 +52,6 @@ task("e2e", "").setAction(async (_, hre) => {
       }),
     );
 
-    await time.increase(seconds(randomNumber(1, 43_200)));
+    await time.increase(seconds(randomNumber(1, 3_600)));
   }
 });
