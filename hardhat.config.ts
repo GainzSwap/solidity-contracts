@@ -78,7 +78,7 @@ const config: HardhatUserConfig = {
       gasPrice: 40e9,
     },
     educhain: {
-      url: "https://rpc.edu-chain.raas.gelato.cloud",
+      url: process.env.EDUCHAIN_RPC,
       accounts: [deployerPrivateKey, newOwnerPrivateKey, newFeeToPrivateKey],
     },
   },
