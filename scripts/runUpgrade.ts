@@ -131,8 +131,6 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   await hre.upgrades.upgradeBeacon(pairBeacon, await pairFactory(), { redeployImplementation: "always" });
   console.log("Pair beacon upgraded successfully.");
 
-  console.log("\nSaving artifacts");
-
   const oracleAddr = computePriceOracleAddr(routerAddress);
   const priceOracle = await hre.ethers.getContractAt("PriceOracle", oracleAddr);
 
@@ -144,6 +142,7 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
     console.log("Added", { pair, oracleAddr });
   }
 
+  console.log("\nSaving artifacts");
   for (const [contract, address] of [
     ["Gainz", gainzAddress],
     ["WNTV", wntvAddr],
