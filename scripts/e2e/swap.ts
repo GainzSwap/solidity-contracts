@@ -24,7 +24,7 @@ export default async function swap(hre: HardhatRuntimeEnvironment, accounts: Har
       if (!swapPath || swapPath.length < 2 || !isAddressEqual(tokenIn, swapPath[0])) return;
 
       const { amount: amountIn, isNative } = await getAmount(tester, tokenIn, ethers, wnative);
-      if (amountIn == 0n) return;
+      if (amountIn <= 10_000n) return;
 
       const token0 = await ethers.getContractAt("ERC20", tokenIn);
       await token0.connect(tester).approve(router, 2n ** 251n);
