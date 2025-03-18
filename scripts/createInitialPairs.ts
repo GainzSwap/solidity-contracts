@@ -13,6 +13,9 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
   const gainz = await ethers.getContract<Gainz>("Gainz", deployer);
   const gainzAddress = await gainz.getAddress();
 
+  const router = await ethers.getContract<Router>("Router", deployer);
+  const wNativeToken = await router.getWrappedNativeToken();
+
   await hre.run("listGainz");
 
   await hre.run("deployERC20", {
@@ -21,23 +24,20 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
     decimals: "18",
   });
 
-  const router = await ethers.getContract<Router>("Router", deployer);
-  const wNativeToken = await router.getWrappedNativeToken();
-
-  for (let index = 1; index <= 5; index++) {
-    const { tokenAddress } = await createERC20(
-      { decimals: randomNumber(0, 18).toFixed(0), name: `${index} Token`, symbol: `${index}TK` },
-      hre,
-    );
-    const { selectTokens } = await getSwapTokens(router, ethers);
-    const { tokenIn } = selectTokens();
-    await hre.run("createPair", {
-      tokenA: tokenAddress,
-      amountA: "0.035",
-      tokenB: tokenIn,
-      amountB: "0.0034",
-    });
-  }
+  // for (let index = 1; index <= 5; index++) {
+  //   const { tokenAddress } = await createERC20(
+  //     { decimals: randomNumber(0, 18).toFixed(0), name: `${index} Token`, symbol: `${index}TK` },
+  //     hre,
+  //   );
+  //   const { selectTokens } = await getSwapTokens(router, ethers);
+  //   const { tokenIn } = selectTokens();
+  //   await hre.run("createPair", {
+  //     tokenA: tokenAddress,
+  //     amountA: "0.035",
+  //     tokenB: tokenIn,
+  //     amountB: "0.0034",
+  //   });
+  // }
 
   const views = await ethers.getContract<Views>("Views", deployer);
 
