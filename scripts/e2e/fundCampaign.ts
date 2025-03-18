@@ -3,6 +3,7 @@ import { Router } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { parseEther } from "ethers";
+import { randomNumber } from "../../utilities";
 
 export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nFunding Campaign");
@@ -24,10 +25,10 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
 
     for (const account of accounts) {
       const amount = await ethers.provider.getBalance(account.address).then(bal => {
-        const randBal = Math.floor(Math.random() * +bal.toString());
-        const amount = BigInt(randBal) / 100_000n;
+        if (bal < minContribution) return 0n;
 
-        return amount < minContribution && bal > minContribution ? minContribution : amount;
+        const amount = BigInt(randomNumber(50e18, Number(minContribution)).toFixed());
+        return bal < amount ? minContribution : amount;
       });
       if (amount < minContribution) continue;
 
