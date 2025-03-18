@@ -38,7 +38,7 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
       continue;
     }
 
-    const slippage = BigInt(randomNumber(1, 10).toFixed());
+    const slippage = BigInt(randomNumber(1, 100).toFixed());
     const _100Percent = 1000n;
     const applySlippage = (amount: bigint) => (amount * _100Percent) / (_100Percent - slippage);
 
@@ -51,19 +51,21 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
 
     if (amountOutMinA < 1n || amountOutMinB < 1n) continue;
 
+    console.log(account.address, "Staking", { tokenA, tokenB });
+
     for (const [address, amount] of [
       [tokenA, amountInA],
       [tokenB, amountInB],
     ] as const) {
       if (isAddressEqual(address, ZeroAddress)) continue;
       const token = await ethers.getContractAt("ERC20", address);
-      await token.connect(account).approve(governance, amount);
+      await token.connect(account).approve(governance, 2n ** 251n);
     }
 
     const value = randomNumber(0, 100) >= 55 ? undefined : aIsWNative ? amountInA : bIsWNative ? amountInB : undefined;
 
-    const bTokenBal = await (value
-      ? account.provider.getBalance(account.address)
+    const bTokenBal = await (value && bIsWNative
+      ? ethers.provider.getBalance(account.address)
       : (await ethers.getContractAt("ERC20", tokenB)).balanceOf(account));
     if (bTokenBal < amountInB) {
       try {

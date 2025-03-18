@@ -15,13 +15,16 @@ import completeCampaign from "./completeCampaign";
 
 task("e2e", "").setAction(async (_, hre) => {
   const actions = [
+    stake,
     completeCampaign,
     claimRewards,
     stake,
     unStake,
     swap,
+    stake,
     transferToken,
     delegate,
+    stake,
     unDelegate,
     fundCampaign,
   ];
