@@ -10,6 +10,7 @@ import {
 } from "../../utilities";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { getAddress, ZeroAddress } from "ethers";
+import { slippageErrors } from "./errors";
 
 export default async function stake(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nStaking");
@@ -37,12 +38,18 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
       continue;
     }
 
+    const slippage = BigInt(randomNumber(1, 10).toFixed());
+    const _100Percent = 1000n;
+    const applySlippage = (amount: bigint) => (amount * _100Percent) / (_100Percent - slippage);
+
     const { amount: amountInA } = await getAmount(account, tokenA, ethers, wnative);
     if (amountInA == 0n) continue;
-    const amountOutMinA = 1n;
+    const amountOutMinA = applySlippage(amountInA);
     const amountInB = await views.getQuote(amountInA, [tokenA, tokenB]);
     if (amountInB == 0n) continue;
-    const amountOutMinB = 1n;
+    const amountOutMinB = applySlippage(amountInB);
+
+    if (amountOutMinA < 1n || amountOutMinB < 1n) continue;
 
     for (const [address, amount] of [
       [tokenA, amountInA],
@@ -55,11 +62,26 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
 
     const value = randomNumber(0, 100) >= 55 ? undefined : aIsWNative ? amountInA : bIsWNative ? amountInB : undefined;
 
-    const hasEnoughBToken =
-      (await (value && bIsWNative
-        ? account.provider.getBalance(account.address)
-        : (await ethers.getContractAt("ERC20", tokenB)).balanceOf(account))) > amountInB;
-    if (!hasEnoughBToken) continue;
+    const bTokenBal = await (value
+      ? account.provider.getBalance(account.address)
+      : (await ethers.getContractAt("ERC20", tokenB)).balanceOf(account));
+    if (bTokenBal < amountInB) {
+      try {
+        await router
+          .connect(account)
+          .swapExactTokensForTokens(
+            amountInA,
+            amountInB,
+            findBestPath([tokenA, tokenB])!,
+            account,
+            Number.MAX_SAFE_INTEGER,
+          );
+      } catch (error) {
+        // console.log(error);
+        console.log("Failed to stake due to b amount", account.address);
+        return;
+      }
+    }
 
     await runInErrorBoundry(
       () =>
@@ -73,7 +95,7 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
             pathToNative,
             { value },
           ),
-      ["AMMLibrary: INSUFFICIENT_AMOUNT"],
+      [...slippageErrors],
     );
     console.log(account.address, "staked");
   }
