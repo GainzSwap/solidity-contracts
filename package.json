@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "scripts": {
     "account": "hardhat run scripts/listAccount.ts",
-    "chain": "hardhat node --network hardhat --no-deploy",
+    "chain": "hardhat node --network hardhat --no-deploy --hostname 0.0.0.0",
     "check-types": "tsc --noEmit --incremental",
     "compile": "hardhat compile",
     "coverage": "REPORT_GAS=true hardhat coverage",
