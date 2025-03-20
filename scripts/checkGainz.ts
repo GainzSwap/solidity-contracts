@@ -1,27 +1,9 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { Gainz, Router } from "../typechain-types";
-import { existsSync, readFileSync, writeFileSync } from "fs";
-
-enum PointLevels {
-  Bronze = "Bronze 🥉",
-  Silver = "Silver 🥈",
-  Gold = "Gold 🥇",
-  Platinum = "Platinum 🌟",
-  Diamond = "Diamond 💎",
-}
-interface IUserStatReturnType {
-  userPoint: number;
-  userLevel: PointLevels;
-  userLevelPosition: number;
-  userLevelRange: number;
-  userPosition: number;
-  walletAddress: string;
-}
-const USERS_POINTS_FILE = "usersPoints.json";
+import { formatEther } from "ethers";
 
 task("checkGainz", "").setAction(async (_, hre) => {
-  const usersPoints: IUserStatReturnType[] = JSON.parse(readFileSync(USERS_POINTS_FILE, "utf8"));
   const { ethers } = hre;
   const { deployer } = await hre.getNamedAccounts();
 
@@ -35,5 +17,9 @@ task("checkGainz", "").setAction(async (_, hre) => {
   const stakersReserve = await governance.rewardsReserve();
   const rewardPerShare = await governance.rewardPerShare();
 
-  console.log({ stakersGainz, stakersReserve, rewardPerShare });
+  console.log({
+    stakersGainz: (+formatEther(stakersGainz)).toLocaleString(),
+    stakersReserve: (+formatEther(stakersReserve)).toLocaleString(),
+    rewardPerShare,
+  });
 });
