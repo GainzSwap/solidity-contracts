@@ -90,9 +90,15 @@ library GovernanceLib {
 				.getBalanceAt(user, nonces[i])
 				.attributes;
 
+			// Added to fix distribution of gainzILODeposit to rewards
+			uint256 tokenRPS = attributes[i].rewardPerShare;
+			uint256 rpsDiff = rewardPerShare >= tokenRPS
+				? rewardPerShare - tokenRPS
+				: rewardPerShare;
+
 			claimableReward += FullMath.mulDiv(
 				attributes[i].stakeWeight,
-				rewardPerShare - attributes[i].rewardPerShare,
+				rpsDiff,
 				FixedPoint128.Q128
 			);
 		}
@@ -640,16 +646,20 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
 		// TODO this should be removed once the GainzSwap ILO is progressed to its end
-		TokenListing memory gainzListing = $.pairOwnerListing[
-			$.launchPair.getCampaignDetails(1).creator
-		];
-		if (gainzListing.campaignId == 1)
-			require(gainzListing.tradeTokenPayment.amount == 0, "TGE not done");
+		TokenPayment memory gainzILOPayment = $
+			.pairOwnerListing[$.launchPair.getCampaignDetails(1).creator]
+			.tradeTokenPayment;
+		// Remove distribution of gainzILODeposit from rewards
+		if (
+			gainzILOPayment.token == $.gainzToken &&
+			$.rewardsReserve >= gainzILOPayment.amount
+		) {
+			$.rewardsReserve -= gainzILOPayment.amount;
+			$.rewardPerShare = 0;
+		}
 
-		uint256 gainzBal = IERC20($.gainzToken).balanceOf(address(this));
-		if (gainzBal < $.rewardsReserve) return;
-
-		uint256 amount = gainzBal - $.rewardsReserve;
+		uint256 amount = IERC20($.gainzToken).balanceOf(address(this)) -
+			$.rewardsReserve;
 		uint _rewardPerShare;
 
 		uint256 totalStakeWeight = GToken($.gtoken).totalStakeWeight();
