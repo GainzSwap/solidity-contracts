@@ -23,7 +23,8 @@ task("fixGovGainzBal", "").setAction(async (_, hre) => {
   const signers = await ethers.getSigners();
 
   while (await govbalIsLow()) {
-    const signer = signers.pop()!;
+    const signer = signers.pop();
+    if (!signer) break;
     const bal = await gainz.balanceOf(signer);
     if (bal > 0n) {
       await gainz.connect(signer).transfer(governance, bal);

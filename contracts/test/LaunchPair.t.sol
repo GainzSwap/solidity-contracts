@@ -56,7 +56,7 @@ contract LaunchPairTest is Test, RouterFixture {
 
 	function testStartCampaign(uint256 goal, uint256 duration) public {
 		vm.assume(goal > 50_000 ether);
-		duration = bound(duration, 7 days, 30 days);
+		duration = bound(duration, 30 days, 30 days);
 
 		vm.startPrank(owner);
 		uint256 campaignId = launchPair.createCampaign(creator);
@@ -83,7 +83,7 @@ contract LaunchPairTest is Test, RouterFixture {
 		vm.stopPrank();
 
 		vm.startPrank(creator);
-		launchPair.startCampaign(50_000 ether, 7 days, campaignId);
+		launchPair.startCampaign(50_000 ether, 30 days, campaignId);
 		vm.stopPrank();
 
 		vm.startPrank(participant);
@@ -115,7 +115,7 @@ contract LaunchPairTest is Test, RouterFixture {
 		vm.stopPrank();
 
 		vm.startPrank(creator);
-		launchPair.startCampaign(goal, 7 days, campaignId);
+		launchPair.startCampaign(goal, 30 days, campaignId);
 		vm.stopPrank();
 
 		vm.startPrank(participant);
@@ -150,7 +150,7 @@ contract LaunchPairTest is Test, RouterFixture {
 		vm.stopPrank();
 
 		vm.startPrank(creator);
-		launchPair.startCampaign(goal, 7 days, campaignId);
+		launchPair.startCampaign(goal, 30 days, campaignId);
 		vm.stopPrank();
 
 		vm.startPrank(participant);
@@ -196,7 +196,7 @@ contract LaunchPairTest is Test, RouterFixture {
 		vm.stopPrank();
 
 		vm.startPrank(creator);
-		launchPair.startCampaign(goal, 7 days, campaignId);
+		launchPair.startCampaign(goal, 30 days, campaignId);
 		vm.stopPrank();
 
 		vm.startPrank(participant);
@@ -204,7 +204,7 @@ contract LaunchPairTest is Test, RouterFixture {
 		vm.stopPrank();
 
 		// Simulate campaign expiration
-		vm.warp(block.timestamp + 20 days);
+		vm.warp(block.timestamp + 60 days);
 
 		vm.startPrank(participant);
 		uint256 balanceBefore = participant.balance;

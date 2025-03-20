@@ -14,7 +14,7 @@ import "@openzeppelin/hardhat-upgrades";
 
 import "./scripts/createInitialPairs";
 import "./scripts/moveTime";
-import "./scripts/updateStartBlock";
+import "./scripts/checkGainz";
 import "./scripts/upgradePairs";
 import "./scripts/e2e";
 import "./scripts/deployNewViews";
