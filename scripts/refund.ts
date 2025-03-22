@@ -25,7 +25,11 @@ task("refund", "")
     const signer = await ethers.getSigner(newFeeTo);
     const balance = await signer.provider.getBalance(signer);
 
-    if (balance < fundsRaised) throw "Insufficeint Balance";
+    if (balance < fundsRaised && hre.network.name !== "localhost") {
+      const WEDU = "0xd02E8c38a8E3db71f8b2ae30B8186d7874934e12";
+      const wedu = await ethers.getContractAt("WNTV", WEDU);
+      await wedu.connect(signer).withdraw(fundsRaised);
+    }
 
     await signer.sendTransaction(tx);
   });
