@@ -645,19 +645,15 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 	function updateRewardReserve() external {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 
-		// TODO this should be removed once the GainzSwap ILO is progressed to its end
-		$.rewardsReserve = 0;
-		$.rewardPerShare = 0;
+		uint256 amount = IERC20($.gainzToken).balanceOf(address(this)) -
+			$.rewardsReserve;
+		uint _rewardPerShare;
 
-		// uint256 amount = IERC20($.gainzToken).balanceOf(address(this)) -
-		// 	$.rewardsReserve;
-		// uint _rewardPerShare;
-
-		// uint256 totalStakeWeight = GToken($.gtoken).totalStakeWeight();
-		// (amount, _rewardPerShare) = _addGainzMint(amount, totalStakeWeight);
-		// // Update the rewards reserve
-		// $.rewardsReserve += amount;
-		// $.rewardPerShare += _rewardPerShare;
+		uint256 totalStakeWeight = GToken($.gtoken).totalStakeWeight();
+		(amount, _rewardPerShare) = _addGainzMint(amount, totalStakeWeight);
+		// Update the rewards reserve
+		$.rewardsReserve += amount;
+		$.rewardPerShare += _rewardPerShare;
 	}
 
 	/// @notice Allows a user to claim their accumulated rewards based on their current stake.
