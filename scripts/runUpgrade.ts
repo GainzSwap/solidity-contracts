@@ -1,24 +1,48 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
-import { Router } from "../typechain-types";
+import { Gainz, Router } from "../typechain-types";
+import { computePriceOracleAddr, getGovernanceLibraries, getRouterLibraries, sleep } from "../utilities";
+import { ZeroAddress } from "ethers";
 
 task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   const { deployer } = await hre.getNamedAccounts();
   const deployerSigner = await hre.ethers.getSigner(deployer);
 
   const router = await hre.ethers.getContract<Router>("Router", deployer);
-  const govAddress = await router.getGovernance();
+  const gainz = await hre.ethers.getContract<Gainz>("Gainz", deployer);
 
-  await hre.run("compile");
+  const routerAddress = await router.getAddress();
+  const gainzAddress = await gainz.getAddress();
+  const pairBeaconAddress = await router.getPairsBeacon();
+  const wntvAddr = await router.getWrappedNativeToken();
+
+  const govAddress = await router.getGovernance();
+  const governance = await hre.ethers.getContractAt("Governance", govAddress);
+
+  const gTokenAddress = await governance.getGToken();
+  const launchPairAddress = await governance.launchPair();
 
   console.log("Starting Upgrades");
+  await hre.run("compile");
 
-  const govLibs = {
-    DeployLaunchPair: "0x9040A72f154b5Ed9FbB289733e9f2e4d9660fe48",
-    GovernanceLib: "0xaE3fFE7CE50BCd53822ba75429f67a62265174d1",
-    DeployGToken: "0x12623F917DA839519f59072497379C0e7Ce89792",
-    OracleLibrary: "0x3CabfB0485D0e865452dc4A1A4f812B5513c636C",
-  };
+  // Gainz
+  console.log("Upgrading Gainz");
+  await hre.upgrades.forceImport(
+    gainzAddress,
+    await hre.ethers.getContractFactory("Gainz", { signer: deployerSigner }),
+  );
+  const newGainz = await hre.upgrades.upgradeProxy(
+    gainzAddress,
+    await hre.ethers.getContractFactory("Gainz", { signer: deployerSigner }),
+    {
+      redeployImplementation: "always",
+    },
+  );
+  console.log("Gainz upgraded successfully.");
+
+  // Libraries
+  console.log("Deploying Libraries");
+  const govLibs = await getGovernanceLibraries(hre.ethers);
 
   // Governance
   console.log("Upgrading Governance");
@@ -26,22 +50,37 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
     govAddress,
     await hre.ethers.getContractFactory("Governance", { libraries: govLibs, signer: deployerSigner }),
   );
-  await hre.upgrades.upgradeProxy(
+  const newGovernance = await hre.upgrades.upgradeProxy(
     govAddress,
     await hre.ethers.getContractFactory("Governance", { libraries: govLibs, signer: deployerSigner }),
     { redeployImplementation: "always", unsafeAllowLinkedLibraries: true },
   );
   console.log("Governance upgraded successfully.");
 
-  const { hash } = await (await hre.ethers.getContractAt("Governance", govAddress)).updateRewardReserve();
-  console.log({ hash });
-  await hre.run("checkGainz");
+  console.log("Upgrading LaunchPair");
+  await hre.upgrades.forceImport(
+    launchPairAddress,
+    await hre.ethers.getContractFactory("LaunchPair", { signer: deployerSigner }),
+  );
+  const newLaunchPair = await hre.upgrades.upgradeProxy(
+    launchPairAddress,
+    await hre.ethers.getContractFactory("LaunchPair", { signer: deployerSigner }),
+    {
+      redeployImplementation: "always",
+    },
+  );
+  await newLaunchPair.acquireOwnership();
+  console.log("LaunchPair upgraded successfully.");
 
-  // console.log("\nSaving artifacts");
-  // for (const [contract, address] of [["Governance", govAddress]]) {
-  //   const { abi, metadata } = await hre.deployments.getExtendedArtifact(contract);
-  //   await hre.deployments.save(contract, { abi, metadata, address });
-  // }
+  console.log("\nSaving artifacts");
+  for (const [contract, address] of [
+    ["Gainz", gainzAddress],
+    ["LaunchPair", launchPairAddress],
+    ["Governance", govAddress],
+  ]) {
+    const { abi, metadata } = await hre.deployments.getExtendedArtifact(contract);
+    await hre.deployments.save(contract, { abi, metadata, address });
+  }
 
   // Run any additional tasks, such as generating TypeScript ABIs
   await hre.deployments.run("generateTsAbis");

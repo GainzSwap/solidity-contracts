@@ -20,18 +20,12 @@ export default async function completeCampaign(hre: HardhatRuntimeEnvironment, a
   const refund = async <C extends { fundsRaised: bigint; id: bigint; creator: string }>(c: C) => {
     if (isAddressEqual(c.creator, ZeroAddress)) return;
 
-    const { campaignId } = await governance.pairListing(c.creator);
+    const { campaignId } = await launchPair.pairListing(c.creator);
     if (campaignId != c.id) return;
 
-    const launchPairBal = await ethers.provider.getBalance(launchPair);
-    if (launchPairBal < c.fundsRaised) {
-      console.log("Refunding campaign", c.id);
-      await hre.run("refund", { id: String(c.id) });
-
-      console.log("Progressing campaign", c.id);
-      const campaignCreator = await ethers.getSigner(c.creator);
-      await governance.connect(campaignCreator).progressNewPairListing();
-    }
+    console.log("Progressing campaign", c.id);
+    const campaignCreator = await ethers.getSigner(c.creator);
+    await launchPair.connect(campaignCreator).progressNewPairListing();
   };
   for (const account of accounts) {
     const userContributedCampaignIDs = await launchPair.getUserCampaigns(account);

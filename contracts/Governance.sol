@@ -30,8 +30,6 @@ import { LaunchPair } from "./LaunchPair.sol";
 import "./types.sol";
 import "./errors.sol";
 
-uint256 constant MIN_LIQ_VALUE_FOR_LISTING = 5_000e18;
-
 library GovernanceLib {
 	using Epochs for Epochs.Storage;
 	using GTokenLib for GTokenLib.Attributes;
@@ -39,36 +37,6 @@ library GovernanceLib {
 	using TokenPayments for address;
 	using Number for uint256;
 	using EnumerableSet for EnumerableSet.AddressSet;
-
-	/// @notice Validates the GToken payment for the listing based on the total ADEX amount in liquidity.
-	/// @param payment The payment details for the GToken.
-	/// @return bool indicating if the GToken payment is valid.
-	function _isValidGTokenPaymentForListing(
-		TokenPayment calldata payment,
-		address gtoken,
-		address gainzToken,
-		uint256 currentEpoch
-	) private view returns (bool) {
-		// Ensure the payment token is the correct GToken contract
-		if (payment.token != gtoken) {
-			return false;
-		}
-
-		// Retrieve the GToken attributes for the specified nonce
-		GTokenLib.Attributes memory attributes = GToken(gtoken)
-			.getBalanceAt(msg.sender, payment.nonce)
-			.attributes;
-
-		require(
-			attributes.epochsLeft(currentEpoch) >= 1079,
-			"Security GToken Payment Expired"
-		);
-
-		return
-			(attributes.lpDetails.token0 == gainzToken ||
-				attributes.lpDetails.token1 == gainzToken) &&
-			payment.amount >= MIN_LIQ_VALUE_FOR_LISTING;
-	}
 
 	function _calculateClaimableReward(
 		address user,
@@ -183,74 +151,6 @@ library GovernanceLib {
 			block.timestamp + 1
 		);
 	}
-
-	function proposeNewPairListing(
-		Governance.GovernanceStorage storage $,
-		TokenPayment calldata securityPayment,
-		TokenPayment calldata tradeTokenPayment
-	) external {
-		address tradeToken = tradeTokenPayment.token;
-
-		// Ensure there is no active listing proposal
-		require(
-			$.pairOwnerListing[msg.sender].owner == address(0),
-			"Governance: Previous proposal not completed"
-		);
-
-		// Validate the trade token and ensure it is not already listed
-		bool isNewAddition = $.pendingOrListedTokens.add(tradeToken);
-		require(
-			isERC20(tradeToken) &&
-				isNewAddition &&
-				!isERC20(
-					PriceOracle(OracleLibrary.oracleAddress($.router)).pairFor(
-						tradeToken,
-						$.wNativeToken
-					)
-				),
-			"Governance: Invalid Trade token"
-		);
-
-		if (tradeToken != $.gainzToken) {
-			require(
-				_isValidGTokenPaymentForListing(
-					securityPayment,
-					$.gtoken,
-					$.gainzToken,
-					$.epochs.currentEpoch()
-				),
-				"Governance: Invalid GToken Payment for proposal"
-			);
-			securityPayment.receiveTokenFor(
-				msg.sender,
-				address(this),
-				$.wNativeToken
-			);
-		}
-
-		require(
-			tradeTokenPayment.amount > 0,
-			"Governance: Must send potential initial liquidity"
-		);
-		tradeTokenPayment.receiveTokenFor(
-			msg.sender,
-			address(this),
-			$.wNativeToken
-		);
-
-		// Update the active listing with the new proposal details
-		Governance.TokenListing memory activeListing;
-		activeListing.owner = msg.sender;
-		activeListing.tradeTokenPayment = tradeTokenPayment;
-		activeListing.securityGTokenPayment = securityPayment;
-		activeListing.endEpoch = $.epochs.currentEpoch(); // Voting is disabled
-		activeListing.campaignId = $.launchPair.createCampaign(msg.sender);
-
-		$.pairOwnerListing[activeListing.owner] = activeListing;
-		$.pairOwnerListing[
-			activeListing.tradeTokenPayment.token
-		] = activeListing;
-	}
 }
 
 /// @title Governance Contract
@@ -339,8 +239,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 		$.launchPair = DeployLaunchPair.newLaunchPair($.gtoken, proxyAdmin);
 	}
-
-	error InvalidPayment(TokenPayment payment, uint256 value);
 
 	function _getDesiredToken(
 		address[] calldata path,
@@ -656,6 +554,48 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		$.rewardPerShare += _rewardPerShare;
 	}
 
+	function createPair(
+		TokenPayment calldata tradeTokenPayment,
+		TokenPayment calldata pairedTokenPayment,
+		address[] calldata pathToNative
+	) external returns (uint256) {
+		GovernanceStorage storage $ = _getGovernanceStorage();
+		require(msg.sender == address($.launchPair), "Governance: FORBIDDEN");
+
+		_receiveAndApprovePayment(tradeTokenPayment, $.router, $.wNativeToken);
+		_receiveAndApprovePayment(pairedTokenPayment, $.router, $.wNativeToken);
+
+		(address pair, uint256 liquidity) = Router(payable($.router))
+			.createPair(tradeTokenPayment, pairedTokenPayment);
+
+		uint256 liqValue = pathToNative[pathToNative.length - 1] ==
+			pairedTokenPayment.token &&
+			pathToNative.length == 1
+			? pairedTokenPayment.amount
+			: _computeLiqValue(
+				$.router,
+				$.wNativeToken,
+				tradeTokenPayment,
+				pairedTokenPayment,
+				pathToNative
+			);
+		LiquidityInfo memory liqInfo = LiquidityInfo({
+			pair: pair,
+			liquidity: liquidity,
+			liqValue: liqValue,
+			token0: Pair(pair).token0(),
+			token1: Pair(pair).token1()
+		});
+
+		return
+			GToken($.gtoken).mintGToken(
+				address($.launchPair),
+				$.rewardPerShare,
+				60,
+				liqInfo
+			);
+	}
+
 	/// @notice Allows a user to claim their accumulated rewards based on their current stake.
 	/// @dev This function will transfer the calculated claimable reward to the user,
 	/// 	 update the user's reward attributes, and decrease the rewards reserve.
@@ -716,138 +656,14 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 		);
 	}
 
-	function _returnListingDeposits(TokenListing memory listing) internal {
-		GovernanceStorage storage $ = _getGovernanceStorage();
-
-		if (listing.securityGTokenPayment.nonce != 0)
-			listing.securityGTokenPayment.sendToken(listing.owner);
-
-		if (listing.tradeTokenPayment.amount > 0) {
-			listing.tradeTokenPayment.sendToken(listing.owner);
-		}
-
-		delete $.pairOwnerListing[msg.sender];
-		delete $.pairOwnerListing[listing.tradeTokenPayment.token];
-		$.pendingOrListedTokens.remove(listing.tradeTokenPayment.token);
-	}
-
-	/**
-	 * @notice Progresses the new pair listing process for the calling address.
-	 *         This function handles the various stages of the listing, including
-	 *         voting, launch pad campaign, and liquidity provision.
-	 */
-	function progressNewPairListing() external {
-		GovernanceStorage storage $ = _getGovernanceStorage();
-
-		// Retrieve the token listing associated with the caller's address.
-		TokenListing storage listing = $.pairOwnerListing[msg.sender];
-
-		// Ensure that a valid listing exists after the potential refresh.
-		require(
-			listing.owner == msg.sender && listing.campaignId > 0,
-			"No listing found"
-		);
-
-		// Retrieve details of the existing campaign.
-		LaunchPair.Campaign memory campaign = $.launchPair.getCampaignDetails(
-			listing.campaignId
-		);
-
-		if (campaign.goal > 0 && block.timestamp > campaign.deadline) {
-			if (campaign.fundsRaised < campaign.goal) {
-				campaign.status = LaunchPair.CampaignStatus.Failed;
-			} else {
-				campaign.status = LaunchPair.CampaignStatus.Success;
-			}
-		}
-
-		// Check the campaign status.
-		if (campaign.status != LaunchPair.CampaignStatus.Success) {
-			// If the campaign failed, return the deposits to the listing owner.
-			if (campaign.status == LaunchPair.CampaignStatus.Failed) {
-				_returnListingDeposits(listing);
-				return;
-			}
-
-			// If the campaign is not complete, revert the transaction.
-			revert("Governance: Funding not complete");
-		}
-
-		require(!campaign.isWithdrawn, "Governance: CAMPAIGN_FUNDS_WITHDRAWN");
-
-		// Store the current balance of the contract before withdrawing funds.
-		uint256 ethBal = address(this).balance;
-		// Withdraw the funds raised in the campaign.
-		uint256 fundsRaised = $.launchPair.withdrawFunds(listing.campaignId);
-		// Ensure that the funds were successfully withdrawn.
-		require(
-			ethBal + fundsRaised == address(this).balance,
-			"Governance: Funds not withdrawn for campaign"
-		);
-
-		listing.tradeTokenPayment.approve($.router);
-
-		// Create the trading pair using the router and receive GToken tokens.
-		delete $.pairOwnerListing[listing.tradeTokenPayment.token];
-		(address pair, uint256 liquidity) = Router(payable($.router))
-			.createPair{ value: fundsRaised }(
-			listing.tradeTokenPayment,
-			TokenPayment({
-				token: $.wNativeToken,
-				nonce: 0,
-				amount: fundsRaised
-			})
-		);
-
-		uint256 gTokenNonce = GToken($.gtoken).mintGToken(
-			address(this),
-			$.rewardPerShare,
-			60,
-			LiquidityInfo({
-				pair: pair,
-				liquidity: liquidity,
-				liqValue: fundsRaised,
-				token0: Pair(pair).token0(),
-				token1: Pair(pair).token1()
-			})
-		);
-
-		// Return the security GToken payment after successful governance entry.
-		if (listing.securityGTokenPayment.nonce != 0)
-			listing.securityGTokenPayment.sendToken(listing.owner);
-
-		TokenPayment memory gTokenPayment = TokenPayment({
-			amount: GToken($.gtoken).balanceOf(address(this), gTokenNonce),
-			nonce: gTokenNonce,
-			token: $.gtoken
-		});
-
-		// Approve the GToken tokens for use by the launch pair contract.
-		gTokenPayment.approve(address($.launchPair));
-		// Transfer the GToken tokens to the launch pair contract.
-		$.launchPair.receiveGToken(gTokenPayment, listing.campaignId);
-		// complete the proposal
-		delete $.pairOwnerListing[msg.sender];
-	}
-
-	/// @notice Proposes a new pair listing by submitting the required listing fee and GToken payment.
-	/// @param securityPayment The GToken payment as security deposit
-	/// @param tradeTokenPayment The the trade token to be listed with launchPair distribution amount, if any.
-	function proposeNewPairListing(
-		TokenPayment calldata securityPayment,
-		TokenPayment calldata tradeTokenPayment
-	) external {
-		GovernanceLib.proposeNewPairListing(
-			_getGovernanceStorage(),
-			securityPayment,
-			tradeTokenPayment
-		);
-	}
-
 	// ******* VIEWS *******
 
 	function getGToken() external view returns (address) {
 		return _getGovernanceStorage().gtoken;
+	}
+
+	function getGainzToken() external view returns (address) {
+		return _getGovernanceStorage().gainzToken;
 	}
 
 	function rewardsReserve() external view returns (uint256) {
@@ -883,8 +699,8 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 	function pairListing(
 		address pairOwner
-	) public view returns (Governance.TokenListing memory) {
-		return _getGovernanceStorage().pairOwnerListing[pairOwner];
+	) public view returns (LaunchPair.TokenListing memory) {
+		return _getGovernanceStorage().launchPair.pairListing(pairOwner);
 	}
 
 	function epochs() public view returns (Epochs.Storage memory) {
@@ -893,10 +709,6 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 
 	function getRouter() public view returns (address) {
 		return _getGovernanceStorage().router;
-	}
-
-	function minLiqValueForListing() public pure returns (uint256) {
-		return MIN_LIQ_VALUE_FOR_LISTING;
 	}
 
 	function currentEpoch() public view returns (uint256) {

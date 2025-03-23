@@ -7,20 +7,31 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { ERC1155HolderUpgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
 
 import { TokenPayment, TokenPayments } from "./libraries/TokenPayments.sol";
-import { GToken, GTokenBalance } from "./tokens/GToken/GToken.sol";
+import { GToken, GTokenBalance, GTokenLib } from "./tokens/GToken/GToken.sol";
 import { Router } from "./Router.sol";
 import { Governance } from "./Governance.sol";
 import { FullMath } from "./libraries/FullMath.sol";
 
-import "hardhat/console.sol";
+import { PriceOracle } from "./PriceOracle.sol";
+import { OracleLibrary } from "./libraries/OracleLibrary.sol";
+import { Epochs } from "./libraries/Epochs.sol";
+
+import "./libraries/utils.sol";
+import "./errors.sol";
+
+uint256 constant MIN_LIQ_VALUE_FOR_LISTING = 5_000e18;
 
 /**
  * @title LaunchPair
  * @dev This contract facilitates the creation and management of crowdfunding campaigns for launching new tokens. Participants contribute funds to campaigns, and if the campaign is successful, they receive launchPair tokens in return. If the campaign fails, their contributions are refunded.
  */
-contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
+contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 	using TokenPayments for TokenPayment;
+	using TokenPayments for address;
 	using EnumerableSet for EnumerableSet.UintSet;
+	using EnumerableSet for EnumerableSet.AddressSet;
+	using Epochs for Epochs.Storage;
+	using GTokenLib for GTokenLib.Attributes;
 
 	enum CampaignStatus {
 		Pending,
@@ -38,6 +49,15 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		bool isWithdrawn;
 		CampaignStatus status;
 	}
+
+	struct TokenListing {
+		address owner;
+		TokenPayment securityGTokenPayment;
+		TokenPayment tradeTokenPayment;
+		uint256 campaignId;
+		address pairedToken;
+	}
+
 	/// @custom:storage-location erc7201:gainz.LaunchPair.storage
 	struct MainStorage {
 		// Mapping from campaign ID to Campaign struct
@@ -51,6 +71,16 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		// Total number of campaigns created
 		uint256 campaignCount;
 		GToken gToken;
+		mapping(address => TokenListing) activeTokenListings;
+		mapping(address => TokenListing) failedTokenListings;
+		EnumerableSet.AddressSet allowedPairedTokens;
+		mapping(address => address[]) pathToNative;
+		address dEDU;
+		address gainz;
+		address governance;
+		address router;
+		EnumerableSet.AddressSet pendingTokenListing;
+		Epochs.Storage epochs;
 	}
 
 	// Event emitted when a new campaign is created
@@ -169,14 +199,60 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		$.gToken = GToken(_gToken);
 	}
 
+	function acquireOwnership() external {
+		MainStorage storage $ = _getMainStorage();
+		require($.governance == address(0), "Ownership aquired");
+		$.governance = owner();
+		_transferOwnership(msg.sender);
+
+		Governance governance = Governance(payable($.governance));
+		$.router = governance.getRouter();
+		$.epochs = governance.epochs();
+		$.gainz = governance.getGainzToken();
+
+		Router router = Router(payable($.router));
+		$.dEDU = router.getWrappedNativeToken();
+	}
+
+	function addAllowedPairedToken(
+		address[] calldata pathToNative
+	) external onlyOwner {
+		MainStorage storage $ = _getMainStorage();
+
+		require(
+			pathToNative[pathToNative.length - 1] == $.dEDU,
+			"Invalid path"
+		);
+
+		if (pathToNative.length > 1) {
+			PriceOracle priceOracle = PriceOracle(
+				OracleLibrary.oracleAddress($.router)
+			);
+			for (uint256 i = 0; i < pathToNative.length - 1; i++) {
+				require(
+					isERC20(
+						priceOracle.pairFor(
+							pathToNative[i],
+							pathToNative[i + 1]
+						)
+					),
+					"Invalid path"
+				);
+			}
+		}
+
+		$.allowedPairedTokens.add(pathToNative[0]);
+		$.pathToNative[pathToNative[0]] = pathToNative;
+	}
+
 	/**
 	 * @dev Creates a new crowdfunding campaign.
 	 * @param _creator The address of the campaign creator.
 	 * @return campaignId The ID of the newly created campaign.
 	 */
-	function createCampaign(
+	function _createCampaign(
 		address _creator
-	) external onlyOwner returns (uint256 campaignId) {
+	) internal returns (uint256 campaignId) {
 		MainStorage storage $ = _getMainStorage();
 
 		campaignId = ++$.campaignCount;
@@ -191,40 +267,204 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		});
 	}
 
-	function receiveGToken(
+	/// @notice Validates the GToken payment for the listing based on the total ADEX amount in liquidity.
+	/// @param payment The payment details for the GToken.
+	/// @return bool indicating if the GToken payment is valid.
+	function _isValidGTokenPaymentForListing(
 		TokenPayment calldata payment,
-		uint256 _campaignId
-	) external onlyOwner campaignExists(_campaignId) hasMetGoal(_campaignId) {
+		address gtoken,
+		address gainzToken,
+		uint256 currentEpoch
+	) private view returns (bool) {
+		// Ensure the payment token is the correct GToken contract
+		if (payment.token != gtoken) {
+			return false;
+		}
+
+		// Retrieve the GToken attributes for the specified nonce
+		GTokenLib.Attributes memory attributes = GToken(gtoken)
+			.getBalanceAt(msg.sender, payment.nonce)
+			.attributes;
+
+		require(
+			attributes.epochsLeft(currentEpoch) >= 1079,
+			"Security GToken Payment Expired"
+		);
+
+		return
+			(attributes.lpDetails.token0 == gainzToken ||
+				attributes.lpDetails.token1 == gainzToken) &&
+			payment.amount >= MIN_LIQ_VALUE_FOR_LISTING;
+	}
+
+	/// @notice Proposes a new pair listing by submitting the required listing fee and GToken payment.
+	/// @param securityPayment The GToken payment as security deposit
+	/// @param tradeTokenPayment The the trade token to be listed with launchPair distribution amount, if any.
+	function createCampaign(
+		TokenPayment calldata securityPayment,
+		TokenPayment calldata tradeTokenPayment,
+		address pairedToken,
+		uint256 goal,
+		uint256 duration
+	) external {
 		MainStorage storage $ = _getMainStorage();
 
 		require(
-			payment.amount > 0 &&
-				payment.nonce > 0 &&
-				address($.gToken) == payment.token,
-			"LaunchPair: Invalid GToken received"
+			$.allowedPairedTokens.contains(pairedToken),
+			"Governance: Invalid paired token"
 		);
+		address tradeToken = tradeTokenPayment.token;
 
-		Campaign storage campaign = $.campaigns[_campaignId];
+		// Ensure there is no active listing proposal
 		require(
-			campaign.gtokenNonce == 0,
-			"Launchpair: Campaign received gToken already"
+			$.activeTokenListings[msg.sender].owner == address(0),
+			"Governance: Previous proposal not completed"
 		);
-		campaign.gtokenNonce = payment.nonce;
 
-		payment.receiveSFT();
+		// Validate the trade token and ensure it is not already listed
+		bool isNewAddition = $.pendingTokenListing.add(tradeToken);
+		require(
+			isERC20(tradeToken) &&
+				isNewAddition &&
+				!isERC20(
+					PriceOracle(OracleLibrary.oracleAddress($.router)).pairFor(
+						tradeToken,
+						pairedToken
+					)
+				),
+			"Governance: Invalid Trade token"
+		);
+
+		require(
+			_isValidGTokenPaymentForListing(
+				securityPayment,
+				address($.gToken),
+				$.gainz,
+				$.epochs.currentEpoch()
+			),
+			"Governance: Invalid GToken Payment for proposal"
+		);
+		securityPayment.receiveTokenFor(msg.sender, address(this), $.dEDU);
+
+		require(
+			tradeTokenPayment.amount > 0,
+			"Governance: Must send potential initial liquidity"
+		);
+		tradeTokenPayment.receiveTokenFor(msg.sender, address(this), $.dEDU);
+
+		// Update the active listing with the new proposal details
+		TokenListing storage listing = $.activeTokenListings[msg.sender];
+		listing.owner = msg.sender;
+		listing.tradeTokenPayment = tradeTokenPayment;
+		listing.securityGTokenPayment = securityPayment;
+		listing.pairedToken = pairedToken;
+		listing.campaignId = _createCampaign(msg.sender);
+
+		$.activeTokenListings[listing.owner] = listing;
+		$.activeTokenListings[listing.tradeTokenPayment.token] = listing;
+
+		_startCampaign(goal, duration, listing.campaignId);
+	}
+
+	function _removeListing(TokenListing memory listing) internal {
+		MainStorage storage $ = _getMainStorage();
+
+		delete $.activeTokenListings[listing.owner];
+		delete $.activeTokenListings[listing.tradeTokenPayment.token];
+		$.pendingTokenListing.remove(listing.tradeTokenPayment.token);
+	}
+
+	function _returnListingDeposits(TokenListing memory listing) internal {
+		MainStorage storage $ = _getMainStorage();
+
+		if (listing.securityGTokenPayment.nonce != 0)
+			listing.securityGTokenPayment.sendToken(listing.owner);
+
+		if (listing.tradeTokenPayment.amount > 0) {
+			listing.tradeTokenPayment.sendToken(listing.owner);
+		}
+
+		_removeListing(listing);
+		$.failedTokenListings[listing.owner] = listing;
 	}
 
 	/**
-	 * @dev Starts a created campaign.
-	 * @param _goal The funding goal for the campaign.
-	 * @param _duration The duration of the campaign in seconds.
-	 * @param _campaignId The ID of the newly created campaign.
+	 * @notice Progresses the new pair listing process for the calling address.
+	 *         This function handles the various stages of the listing, including
+	 *         voting, launch pad campaign, and liquidity provision.
 	 */
-	function startCampaign(
+	function progressNewPairListing() external {
+		MainStorage storage $ = _getMainStorage();
+
+		// Retrieve the token listing associated with the caller's address.
+		TokenListing memory listing = $.activeTokenListings[msg.sender];
+
+		// Ensure that a valid listing exists after the potential refresh.
+		require(
+			listing.owner == msg.sender && listing.campaignId > 0,
+			"No listing found"
+		);
+
+		// Retrieve details of the existing campaign.
+		Campaign storage campaign = $.campaigns[listing.campaignId];
+
+		if (campaign.goal > 0 && block.timestamp > campaign.deadline) {
+			if (campaign.fundsRaised < campaign.goal) {
+				campaign.status = LaunchPair.CampaignStatus.Failed;
+			} else {
+				campaign.status = LaunchPair.CampaignStatus.Success;
+			}
+		}
+
+		// Check the campaign status.
+		if (campaign.status != LaunchPair.CampaignStatus.Success) {
+			// If the campaign failed, return the deposits to the listing owner.
+			if (campaign.status == LaunchPair.CampaignStatus.Failed) {
+				_returnListingDeposits(listing);
+				return;
+			}
+
+			// If the campaign is not complete, revert the transaction.
+			revert("Governance: Funding not complete");
+		}
+
+		require(!campaign.isWithdrawn, "Governance: CAMPAIGN_FUNDS_WITHDRAWN");
+
+		uint256 fundsRaised = _markCampaignDone(campaign, listing.campaignId);
+
+		// Return the security GToken payment after successful governance entry.
+		if (listing.securityGTokenPayment.nonce != 0)
+			listing.securityGTokenPayment.sendToken(listing.owner);
+
+		TokenPayment memory pairedTokenPayment = TokenPayment({
+			token: listing.pairedToken,
+			nonce: 0,
+			amount: fundsRaised
+		});
+
+		listing.tradeTokenPayment.approve($.governance);
+		pairedTokenPayment.approve($.governance);
+		uint256 gTokenNonce = Governance(payable($.governance)).createPair(
+			listing.tradeTokenPayment,
+			pairedTokenPayment,
+			$.pathToNative[listing.pairedToken]
+		);
+
+		// Check to ensure GToken was received
+		require(
+			$.gToken.balanceOf(address(this), gTokenNonce) > 0,
+			"LaunchPair: GToken not received"
+		);
+		campaign.gtokenNonce = gTokenNonce;
+
+		_removeListing(listing);
+	}
+
+	function _startCampaign(
 		uint256 _goal,
 		uint256 _duration,
 		uint256 _campaignId
-	) external onlyCreator(_campaignId) {
+	) internal {
 		require(
 			_goal >= 25_000 ether &&
 				_duration >= 30 days &&
@@ -257,66 +497,59 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 	 * @param _campaignId The ID of the campaign to contribute to.
 	 */
 	function contribute(
-		uint256 _campaignId,
-		uint256 referrerId
+		TokenPayment memory payment,
+		uint256 _campaignId
 	) external payable campaignExists(_campaignId) isNotExpired(_campaignId) {
-		require(msg.value >= 1 ether, "Minimum contribution is 1 $EDU");
+		// Validate the payment amount
+		if (
+			payment.amount < 1 ether ||
+			(msg.value > 0 && payment.amount != msg.value)
+		) revert InvalidPayment(payment, msg.value);
 
 		MainStorage storage $ = _getMainStorage();
-
-		Router router = Router(
-			payable(Governance(payable(owner())).getRouter())
-		);
-
-		uint256 weiAmount = msg.value;
-		payable(router.feeTo()).transfer(msg.value);
-
 		Campaign storage campaign = $.campaigns[_campaignId];
 		require(
 			campaign.status == CampaignStatus.Funding,
 			"Campaign is not in funding status"
 		);
+		require(
+			$.activeTokenListings[campaign.creator].pairedToken ==
+				payment.token,
+			"LaunchPair: Invalid token for campaign"
+		);
 
-		campaign.fundsRaised += weiAmount;
-		$.contributions[_campaignId][msg.sender] += weiAmount;
+		{
+			bool paymentIsNative = msg.value > 0 && payment.token == $.dEDU;
+
+			if (paymentIsNative) payment.token = address(0);
+			payment.receiveTokenFor(msg.sender, address(this), $.dEDU);
+			if (paymentIsNative) payment.token = $.dEDU;
+		}
+
+		uint256 amount = payment.amount;
+		campaign.fundsRaised += amount;
+		$.contributions[_campaignId][msg.sender] += amount;
 
 		// Add the campaign to the user's participated campaigns if this is their first contribution
-		if ($.contributions[_campaignId][msg.sender] == weiAmount) {
+		if ($.contributions[_campaignId][msg.sender] == amount) {
 			$.userCampaigns[msg.sender].add(_campaignId);
 		}
 
-		router.register(msg.sender, referrerId);
-
-		emit ContributionMade(_campaignId, msg.sender, weiAmount);
+		emit ContributionMade(_campaignId, msg.sender, amount);
 	}
 
-	/**
-	 * @dev Withdraw funds after the campaign successfully meets its goal.
-	 * @param _campaignId The ID of the campaign to withdraw funds from.
-	 */
-	function withdrawFunds(
-		uint256 _campaignId
-	)
-		external
-		campaignExists(_campaignId)
-		onlyOwner
-		hasMetGoal(_campaignId)
-		hasNotWithdrawn(_campaignId)
-		returns (uint256 amount)
-	{
-		MainStorage storage $ = _getMainStorage();
-
-		Campaign storage campaign = $.campaigns[_campaignId];
-
+	function _markCampaignDone(
+		Campaign storage campaign,
+		uint256 campaignId
+	) internal returns (uint256 amount) {
 		amount = campaign.fundsRaised;
 		campaign.isWithdrawn = true;
 		campaign.status = CampaignStatus.Success;
 
 		// Remove the campaign from the set of all campaigns
-		_removeCampaignFromActiveCampaigns(_campaignId);
+		_removeCampaignFromActiveCampaigns(campaignId);
 
-		payable(owner()).transfer(amount);
-		emit FundsWithdrawn(_campaignId, msg.sender, amount);
+		emit FundsWithdrawn(campaignId, campaign.creator, amount);
 	}
 
 	/**
@@ -368,16 +601,10 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 			$.contributions[_campaignId][msg.sender] = 0;
 			_removeCampaignFromUserCampaigns(msg.sender, _campaignId);
 
-			uint256 unUsedContributions = gTokenBalance.amount;
-			assert(
-				contribution <= unUsedContributions &&
-					unUsedContributions <= campaign.fundsRaised
-			);
-
 			userLiqShare = FullMath.mulDiv(
 				contribution,
 				gTokenBalance.attributes.lpDetails.liquidity,
-				unUsedContributions
+				gTokenBalance.amount
 			);
 
 			// Split the liquidity between the contract and the user.
@@ -441,7 +668,14 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 		campaign.status = CampaignStatus.Failed;
 		$.activeCampaigns.remove(_campaignId);
 
-		payable(msg.sender).transfer(amount);
+		TokenListing memory listing = $.failedTokenListings[campaign.creator];
+
+		if (listing.pairedToken == address(0)) {
+			// Handle GainzSwap ILO refund
+			payable(msg.sender).transfer(amount);
+		} else {
+			listing.pairedToken.sendFungibleToken(amount, msg.sender);
+		}
 
 		emit RefundIssued(_campaignId, msg.sender, amount);
 	}
@@ -521,6 +755,20 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable {
 
 	function campaignCount() public view returns (uint256) {
 		return _getMainStorage().campaignCount;
+	}
+
+	function pairListing(
+		address pairOwner
+	) external view returns (TokenListing memory) {
+		return _getMainStorage().activeTokenListings[pairOwner];
+	}
+
+	function allowedPairedTokens() external view returns (address[] memory) {
+		return _getMainStorage().allowedPairedTokens.values();
+	}
+
+	function minLiqValueForListing() public pure returns (uint256) {
+		return MIN_LIQ_VALUE_FOR_LISTING;
 	}
 
 	receive() external payable {}

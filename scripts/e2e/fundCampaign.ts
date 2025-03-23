@@ -3,7 +3,7 @@ import { Router } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { parseEther } from "ethers";
-import { randomNumber } from "../../utilities";
+import { getAmount, randomNumber } from "../../utilities";
 
 export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nFunding Campaign");
@@ -12,6 +12,7 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
   const { deployer } = await hre.getNamedAccounts();
 
   const router = await ethers.getContract<Router>("Router", deployer);
+  const wNative = await router.getWrappedNativeToken();
 
   const governance = await ethers.getContractAt("Governance", await router.getGovernance());
   const launchPair = await ethers.getContractAt("LaunchPair", await governance.launchPair());
@@ -20,21 +21,26 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
   const minContribution = parseEther("1");
 
   for (const campaignId of campaignIds) {
-    const { deadline } = await launchPair.getCampaignDetails(campaignId);
+    const { deadline, creator } = await launchPair.getCampaignDetails(campaignId);
     if (deadline <= (await time.latest())) continue;
+    const { pairedToken } = await launchPair.pairListing(creator);
 
     for (const account of accounts) {
-      const amount = await ethers.provider.getBalance(account.address).then(bal => {
-        if (bal < minContribution) return 0n;
+      const { amount, isNative } = await getAmount(account, pairedToken, hre.ethers, wNative).then(
+        ({ amount, isNative }) => {
+          if (amount < minContribution) return { amount: 0n, isNative };
 
-        const amount = BigInt(randomNumber(50e18, Number(minContribution)).toFixed());
-        return bal < amount ? minContribution : amount;
-      });
+          return { amount, isNative };
+        },
+      );
       if (amount < minContribution) continue;
 
-      const totalUsers = +(await router.totalUsers()).toString();
-      const referrerId = [0, 1, 2, 3, 4, 5][(totalUsers + 1) % 3];
-      await launchPair.connect(account).contribute(campaignId, referrerId, { value: amount });
+      const value = isNative ? amount : undefined;
+      if (!value) {
+        await (await ethers.getContractAt("ERC20", pairedToken)).connect(account).approve(launchPair, amount);
+      }
+
+      await launchPair.connect(account).contribute({ nonce: 0, amount, token: pairedToken }, campaignId, { value });
 
       console.log(`${account.address} funded campaign ${campaignId}`);
     }

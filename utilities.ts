@@ -4,7 +4,9 @@ export async function getGovernanceLibraries(ethers: typeof e) {
   const OracleLibrary = await (await ethers.deployContract("OracleLibrary")).getAddress();
 
   const libs = {
-    DeployLaunchPair: await (await ethers.deployContract("DeployLaunchPair")).getAddress(),
+    DeployLaunchPair: await (
+      await ethers.deployContract("DeployLaunchPair", { libraries: { OracleLibrary } })
+    ).getAddress(),
     GovernanceLib: await (await ethers.deployContract("GovernanceLib", { libraries: { OracleLibrary } })).getAddress(),
     DeployGToken: await (await ethers.deployContract("DeployGToken")).getAddress(),
     OracleLibrary,

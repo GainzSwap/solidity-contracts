@@ -3,7 +3,7 @@ import { task } from "hardhat/config";
 import { Gainz, Router, Views } from "../typechain-types";
 import { parseEther, ZeroAddress } from "ethers";
 import { createERC20, CreateERC20Type } from "./createERC20";
-import { getSwapTokens, randomNumber } from "../utilities";
+import { getRandomItem, getSwapTokens, isAddressEqual, randomNumber } from "../utilities";
 import { days } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 
 task("createInitialPairs", "").setAction(async (_, hre) => {
@@ -16,6 +16,16 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
   const router = await ethers.getContract<Router>("Router", deployer);
   const wNativeToken = await router.getWrappedNativeToken();
 
+  const governanceAddress = await router.getGovernance();
+  const governance = await ethers.getContractAt("Governance", governanceAddress);
+
+  const gTokenAddress = await governance.getGToken();
+  const gToken = await ethers.getContractAt("GToken", gTokenAddress);
+
+  const launchPairAddress = await governance.launchPair();
+  const launchPair = await ethers.getContractAt("LaunchPair", launchPairAddress);
+  await launchPair.acquireOwnership();
+
   await hre.run("listGainz");
 
   await hre.run("deployERC20", {
@@ -23,6 +33,13 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
     symbol: "USDC",
     decimals: "18",
   });
+
+  const { swapTokens } = await getSwapTokens(router, hre.ethers);
+  for (const tokenAddress of swapTokens) {
+    await launchPair.addAllowedPairedToken(
+      isAddressEqual(tokenAddress, wNativeToken) ? [wNativeToken] : [tokenAddress, wNativeToken],
+    );
+  }
 
   for (let index = 1; index <= 5; index++) {
     const { tokenAddress } = await createERC20(
@@ -41,16 +58,7 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
 
   const views = await ethers.getContract<Views>("Views", deployer);
 
-  const governanceAddress = await router.getGovernance();
-  const governance = await ethers.getContractAt("Governance", governanceAddress);
-
-  const gTokenAddress = await governance.getGToken();
-  const gToken = await ethers.getContractAt("GToken", gTokenAddress);
-
-  const launchPairAddress = await governance.launchPair();
-  const launchPair = await ethers.getContractAt("LaunchPair", launchPairAddress);
-
-  const listingLiqValue = await governance.minLiqValueForListing();
+  const listingLiqValue = await launchPair.minLiqValueForListing();
 
   const ILOs: CreateERC20Type[] = [
     { name: "Book Spine", symbol: "BKSP", decimals: "18" },
@@ -89,18 +97,17 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
     const goal = parseEther(randomNumber(35_000, 270_000).toFixed(18));
 
     await token.mint(signer, lpAmount);
-    await token.connect(signer).approve(governance, lpAmount);
-    await gToken.connect(signer).setApprovalForAll(governance, true);
+    await token.connect(signer).approve(launchPair, lpAmount);
+    await gToken.connect(signer).setApprovalForAll(launchPair, true);
 
-    await governance
+    await launchPair
       .connect(signer)
-      .proposeNewPairListing(
+      .createCampaign(
         { nonce: securityPayment.nonce, amount: securityPayment.amount, token: gTokenAddress },
         { nonce: 0, amount: lpAmount, token: tokenAddress },
+        getRandomItem(await launchPair.allowedPairedTokens()),
+        goal,
+        days(+randomNumber(30, 40).toFixed(0)),
       );
-
-    const { campaignId } = await governance.pairListing(signer);
-
-    await launchPair.connect(signer).startCampaign(goal, days(+randomNumber(30, 40).toFixed(0)), campaignId);
   }
 });
