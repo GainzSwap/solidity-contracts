@@ -201,7 +201,8 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 
 	function acquireOwnership() external {
 		MainStorage storage $ = _getMainStorage();
-		require($.governance == address(0), "Ownership aquired");
+		if($.governance != address(0)) return;
+
 		$.governance = owner();
 		_transferOwnership(msg.sender);
 
@@ -444,6 +445,9 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 
 		listing.tradeTokenPayment.approve($.governance);
 		pairedTokenPayment.approve($.governance);
+
+		_removeListing(listing);
+
 		uint256 gTokenNonce = Governance(payable($.governance)).createPair(
 			listing.tradeTokenPayment,
 			pairedTokenPayment,
@@ -456,8 +460,6 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 			"LaunchPair: GToken not received"
 		);
 		campaign.gtokenNonce = gTokenNonce;
-
-		_removeListing(listing);
 	}
 
 	function _startCampaign(
@@ -669,6 +671,12 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		$.activeCampaigns.remove(_campaignId);
 
 		TokenListing memory listing = $.failedTokenListings[campaign.creator];
+		if (listing.owner == address(0)) {
+			listing = $.activeTokenListings[campaign.creator];
+
+			_removeListing(listing);
+			$.failedTokenListings[listing.owner] = listing;
+		}
 
 		if (listing.pairedToken == address(0)) {
 			// Handle GainzSwap ILO refund
