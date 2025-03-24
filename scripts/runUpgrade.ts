@@ -1,8 +1,7 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { Gainz, Router } from "../typechain-types";
-import { computePriceOracleAddr, getGovernanceLibraries, getRouterLibraries, sleep } from "../utilities";
-import { ZeroAddress } from "ethers";
+import { getGovernanceLibraries } from "../utilities";
 
 task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   const { deployer } = await hre.getNamedAccounts();
@@ -11,15 +10,11 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   const router = await hre.ethers.getContract<Router>("Router", deployer);
   const gainz = await hre.ethers.getContract<Gainz>("Gainz", deployer);
 
-  const routerAddress = await router.getAddress();
   const gainzAddress = await gainz.getAddress();
-  const pairBeaconAddress = await router.getPairsBeacon();
-  const wntvAddr = await router.getWrappedNativeToken();
 
   const govAddress = await router.getGovernance();
   const governance = await hre.ethers.getContractAt("Governance", govAddress);
 
-  const gTokenAddress = await governance.getGToken();
   const launchPairAddress = await governance.launchPair();
 
   console.log("Starting Upgrades");
@@ -60,13 +55,20 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   console.log("Upgrading LaunchPair");
   await hre.upgrades.forceImport(
     launchPairAddress,
-    await hre.ethers.getContractFactory("LaunchPair", { signer: deployerSigner }),
+    await hre.ethers.getContractFactory("LaunchPair", {
+      signer: deployerSigner,
+      libraries: { OracleLibrary: govLibs.OracleLibrary },
+    }),
   );
   const newLaunchPair = await hre.upgrades.upgradeProxy(
     launchPairAddress,
-    await hre.ethers.getContractFactory("LaunchPair", { signer: deployerSigner }),
+    await hre.ethers.getContractFactory("LaunchPair", {
+      signer: deployerSigner,
+      libraries: { OracleLibrary: govLibs.OracleLibrary },
+    }),
     {
       redeployImplementation: "always",
+      unsafeAllowLinkedLibraries: true,
     },
   );
   await newLaunchPair.acquireOwnership();
