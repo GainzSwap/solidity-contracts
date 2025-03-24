@@ -15,6 +15,8 @@ export default async function unStake(hre: HardhatRuntimeEnvironment, accounts: 
   const gToken = await ethers.getContractAt("GToken", await governance.getGToken());
 
   for (const account of accounts) {
+    if (Math.random() > 0.7) continue;
+
     console.log(`unStaking ${account.address}`);
     const [...nonces] = await gToken.getNonces(account);
     if (!nonces.length) return;

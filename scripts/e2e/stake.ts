@@ -64,10 +64,15 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
 
     const value = randomNumber(0, 100) >= 55 ? undefined : aIsWNative ? amountInA : bIsWNative ? amountInB : undefined;
 
-    const bTokenBal = await (value && bIsWNative
-      ? ethers.provider.getBalance(account.address)
-      : (await ethers.getContractAt("ERC20", tokenB)).balanceOf(account));
-    if (bTokenBal < amountInB) {
+    const isBTokenBalEnough = async () => {
+      const bTokenBal = await (value && bIsWNative
+        ? ethers.provider.getBalance(account.address)
+        : (await ethers.getContractAt("ERC20", tokenB)).balanceOf(account));
+
+      return bTokenBal > amountInB;
+    };
+
+    if (!(await isBTokenBalEnough())) {
       try {
         await router
           .connect(account)
@@ -78,6 +83,11 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
             account,
             Number.MAX_SAFE_INTEGER,
           );
+
+        if (!(await isBTokenBalEnough())) {
+          console.log("Failed to stake due to b amount", account.address);
+          return;
+        }
       } catch (error) {
         // console.log(error);
         console.log("Failed to stake due to b amount", account.address);
