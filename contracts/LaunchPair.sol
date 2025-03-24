@@ -313,8 +313,8 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		MainStorage storage $ = _getMainStorage();
 
 		require(
-			epochsLocked >= 90,
-			"LaunchPair: Epochs locked (vesting) must be at least 90 epochs"
+			epochsLocked >= 90 && epochsLocked <= 1080,
+			"LaunchPair: Epochs locked (vesting) must be at least 90 epochs and not more than 1080 epochs"
 		);
 
 		require(
