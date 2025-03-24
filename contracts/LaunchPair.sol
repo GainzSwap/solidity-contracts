@@ -56,6 +56,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		TokenPayment tradeTokenPayment;
 		uint256 campaignId;
 		address pairedToken;
+		uint256 epochsLocked;
 	}
 
 	/// @custom:storage-location erc7201:gainz.LaunchPair.storage
@@ -201,7 +202,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 
 	function acquireOwnership() external {
 		MainStorage storage $ = _getMainStorage();
-		if($.governance != address(0)) return;
+		if ($.governance != address(0)) return;
 
 		$.governance = owner();
 		_transferOwnership(msg.sender);
@@ -306,20 +307,26 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		TokenPayment calldata tradeTokenPayment,
 		address pairedToken,
 		uint256 goal,
-		uint256 duration
+		uint256 duration,
+		uint256 epochsLocked
 	) external {
 		MainStorage storage $ = _getMainStorage();
 
 		require(
+			epochsLocked >= 90,
+			"LaunchPair: Epochs locked (vesting) must be at least 90 epochs"
+		);
+
+		require(
 			$.allowedPairedTokens.contains(pairedToken),
-			"Governance: Invalid paired token"
+			"LaunchPair: Invalid paired token"
 		);
 		address tradeToken = tradeTokenPayment.token;
 
 		// Ensure there is no active listing proposal
 		require(
 			$.activeTokenListings[msg.sender].owner == address(0),
-			"Governance: Previous proposal not completed"
+			"LaunchPair: Previous proposal not completed"
 		);
 
 		// Validate the trade token and ensure it is not already listed
@@ -333,7 +340,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 						pairedToken
 					)
 				),
-			"Governance: Invalid Trade token"
+			"LaunchPair: Invalid Trade token"
 		);
 
 		require(
@@ -343,13 +350,13 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 				$.gainz,
 				$.epochs.currentEpoch()
 			),
-			"Governance: Invalid GToken Payment for proposal"
+			"LaunchPair: Invalid GToken Payment for proposal"
 		);
 		securityPayment.receiveTokenFor(msg.sender, address(this), $.dEDU);
 
 		require(
 			tradeTokenPayment.amount > 0,
-			"Governance: Must send potential initial liquidity"
+			"LaunchPair: Must send potential initial liquidity"
 		);
 		tradeTokenPayment.receiveTokenFor(msg.sender, address(this), $.dEDU);
 
@@ -360,6 +367,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		listing.securityGTokenPayment = securityPayment;
 		listing.pairedToken = pairedToken;
 		listing.campaignId = _createCampaign(msg.sender);
+		listing.epochsLocked = epochsLocked;
 
 		$.activeTokenListings[listing.owner] = listing;
 		$.activeTokenListings[listing.tradeTokenPayment.token] = listing;
@@ -426,10 +434,10 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 			}
 
 			// If the campaign is not complete, revert the transaction.
-			revert("Governance: Funding not complete");
+			revert("LaunchPair: Funding not complete");
 		}
 
-		require(!campaign.isWithdrawn, "Governance: CAMPAIGN_FUNDS_WITHDRAWN");
+		require(!campaign.isWithdrawn, "LaunchPair: CAMPAIGN_FUNDS_WITHDRAWN");
 
 		uint256 fundsRaised = _markCampaignDone(campaign, listing.campaignId);
 
@@ -451,7 +459,8 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		uint256 gTokenNonce = Governance(payable($.governance)).createPair(
 			listing.tradeTokenPayment,
 			pairedTokenPayment,
-			$.pathToNative[listing.pairedToken]
+			$.pathToNative[listing.pairedToken],
+			listing.epochsLocked
 		);
 
 		// Check to ensure GToken was received

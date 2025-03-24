@@ -557,7 +557,8 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 	function createPair(
 		TokenPayment calldata tradeTokenPayment,
 		TokenPayment calldata pairedTokenPayment,
-		address[] calldata pathToNative
+		address[] calldata pathToNative,
+		uint256 epochsLocked
 	) external returns (uint256) {
 		GovernanceStorage storage $ = _getGovernanceStorage();
 		require(msg.sender == address($.launchPair), "Governance: FORBIDDEN");
@@ -591,7 +592,7 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			GToken($.gtoken).mintGToken(
 				address($.launchPair),
 				$.rewardPerShare,
-				60,
+				epochsLocked,
 				liqInfo
 			);
 	}
