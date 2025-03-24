@@ -289,7 +289,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 			.attributes;
 
 		require(
-			attributes.epochsLeft(currentEpoch) >= 1079,
+			attributes.epochsLeft(currentEpoch) > 999,
 			"Security GToken Payment Expired"
 		);
 
@@ -310,6 +310,10 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		uint256 duration,
 		uint256 epochsLocked
 	) external {
+		require(
+			tradeTokenPayment.token != pairedToken,
+			"LaunchPair: Paired token cannot be the same as trade token"
+		);
 		MainStorage storage $ = _getMainStorage();
 
 		require(
