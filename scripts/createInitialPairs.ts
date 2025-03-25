@@ -31,7 +31,7 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
   await hre.run("deployERC20", {
     name: "USDC",
     symbol: "USDC",
-    decimals: "18",
+    decimals: "8",
   });
 
   const { swapTokens } = await getSwapTokens(router, hre.ethers);
@@ -62,8 +62,9 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
 
   const ILOs: CreateERC20Type[] = [
     { name: "Book Spine", symbol: "BKSP", decimals: "18" },
+    { name: "Grasp Academy", symbol: "GRASP", decimals: "18" },
     { name: "Owlbert Eistein", decimals: "2", symbol: "EMC2" },
-    { name: "Graviton", decimals: "8", symbol: "WEIGHT" },
+    { name: "Capy Friends", decimals: "8", symbol: "Yuzu" },
   ];
   const signers = (await ethers.getSigners()).slice(0, ILOs.length).reverse();
   for (const createParams of ILOs) {

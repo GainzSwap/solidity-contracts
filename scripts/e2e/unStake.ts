@@ -19,7 +19,7 @@ export default async function unStake(hre: HardhatRuntimeEnvironment, accounts: 
 
     console.log(`unStaking ${account.address}`);
     const [...nonces] = await gToken.getNonces(account);
-    if (!nonces.length) return;
+    if (!nonces.length || nonces.length <= 3) return;
 
     await runInErrorBoundry(
       () => governance.connect(account).unStake(getRandomItem(nonces), 1n, 1n),

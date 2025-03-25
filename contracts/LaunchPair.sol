@@ -317,6 +317,11 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		MainStorage storage $ = _getMainStorage();
 
 		require(
+			!$.allowedPairedTokens.contains(tradeTokenPayment.token),
+			"LaunchPair: Invalid trade token"
+		);
+
+		require(
 			epochsLocked >= 90 && epochsLocked <= 1080,
 			"LaunchPair: Epochs locked (vesting) must be at least 90 epochs and not more than 1080 epochs"
 		);
@@ -481,11 +486,12 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		uint256 _campaignId
 	) internal {
 		require(
-			_goal >= 25_000 ether &&
-				_duration >= 30 days &&
-				_duration <= 180 days,
-			"Invalid input"
+			_goal >= 2_000_000,
+			"Goal must be at least 2M units of the token"
 		);
+		require(_duration >= 30 days, "Duration must be at least 30 days");
+		require(_duration <= 180 days, "Duration cannot exceed 180 days");
+
 		MainStorage storage $ = _getMainStorage();
 
 		Campaign storage campaign = $.campaigns[_campaignId];
