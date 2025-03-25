@@ -12,8 +12,8 @@ task("listGainz", "").setAction(async (_, hre) => {
 
   await hre.run("createPair", {
     tokenA: gainzAddress,
-    amountA: "0.5",
+    amountA: "1",
     tokenB: ZeroAddress,
-    amountB: "1",
+    amountB: "0.4395",
   });
 });
