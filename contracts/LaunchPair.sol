@@ -72,8 +72,8 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		// Total number of campaigns created
 		uint256 campaignCount;
 		GToken gToken;
-		mapping(address => TokenListing) activeTokenListings;
-		mapping(address => TokenListing) failedTokenListings;
+		mapping(address => TokenListing) pairListing;
+		mapping(uint256 => mapping(address => TokenListing)) participatedListings;
 		EnumerableSet.AddressSet allowedPairedTokens;
 		mapping(address => address[]) pathToNative;
 		address dEDU;
@@ -334,7 +334,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 
 		// Ensure there is no active listing proposal
 		require(
-			$.activeTokenListings[msg.sender].owner == address(0),
+			$.pairListing[msg.sender].owner == address(0),
 			"LaunchPair: Previous proposal not completed"
 		);
 
@@ -370,7 +370,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		tradeTokenPayment.receiveTokenFor(msg.sender, address(this), $.dEDU);
 
 		// Update the active listing with the new proposal details
-		TokenListing storage listing = $.activeTokenListings[msg.sender];
+		TokenListing storage listing = $.pairListing[msg.sender];
 		listing.owner = msg.sender;
 		listing.tradeTokenPayment = tradeTokenPayment;
 		listing.securityGTokenPayment = securityPayment;
@@ -378,8 +378,8 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		listing.campaignId = _createCampaign(msg.sender);
 		listing.epochsLocked = epochsLocked;
 
-		$.activeTokenListings[listing.owner] = listing;
-		$.activeTokenListings[listing.tradeTokenPayment.token] = listing;
+		$.pairListing[listing.owner] = listing;
+		$.pairListing[listing.tradeTokenPayment.token] = listing;
 
 		_startCampaign(goal, duration, listing.campaignId);
 	}
@@ -387,14 +387,12 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 	function _removeListing(TokenListing memory listing) internal {
 		MainStorage storage $ = _getMainStorage();
 
-		delete $.activeTokenListings[listing.owner];
-		delete $.activeTokenListings[listing.tradeTokenPayment.token];
+		delete $.pairListing[listing.owner];
+		delete $.pairListing[listing.tradeTokenPayment.token];
 		$.pendingTokenListing.remove(listing.tradeTokenPayment.token);
 	}
 
 	function _returnListingDeposits(TokenListing memory listing) internal {
-		MainStorage storage $ = _getMainStorage();
-
 		if (listing.securityGTokenPayment.nonce != 0)
 			listing.securityGTokenPayment.sendToken(listing.owner);
 
@@ -403,7 +401,6 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		}
 
 		_removeListing(listing);
-		$.failedTokenListings[listing.owner] = listing;
 	}
 
 	/**
@@ -415,7 +412,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		MainStorage storage $ = _getMainStorage();
 
 		// Retrieve the token listing associated with the caller's address.
-		TokenListing memory listing = $.activeTokenListings[msg.sender];
+		TokenListing memory listing = $.pairListing[msg.sender];
 
 		// Ensure that a valid listing exists after the potential refresh.
 		require(
@@ -534,8 +531,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 			"Campaign is not in funding status"
 		);
 		require(
-			$.activeTokenListings[campaign.creator].pairedToken ==
-				payment.token,
+			$.pairListing[campaign.creator].pairedToken == payment.token,
 			"LaunchPair: Invalid token for campaign"
 		);
 
@@ -554,6 +550,9 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		// Add the campaign to the user's participated campaigns if this is their first contribution
 		if ($.contributions[_campaignId][msg.sender] == amount) {
 			$.userCampaigns[msg.sender].add(_campaignId);
+			$.participatedListings[_campaignId][msg.sender] = $.pairListing[
+				campaign.creator
+			];
 		}
 
 		emit ContributionMade(_campaignId, msg.sender, amount);
@@ -625,7 +624,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 			userLiqShare = FullMath.mulDiv(
 				contribution,
 				gTokenBalance.attributes.lpDetails.liquidity,
-				gTokenBalance.amount
+				campaign.fundsRaised
 			);
 
 			// Split the liquidity between the contract and the user.
@@ -683,20 +682,14 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		require(amount > 0, "No contributions to refund");
 
 		$.contributions[_campaignId][msg.sender] = 0;
-		_removeCampaignFromUserCampaigns(msg.sender, _campaignId);
 
 		// Update the status to Failed
 		campaign.status = CampaignStatus.Failed;
 		$.activeCampaigns.remove(_campaignId);
 
-		TokenListing memory listing = $.failedTokenListings[campaign.creator];
-		if (listing.owner == address(0)) {
-			listing = $.activeTokenListings[campaign.creator];
-
-			_removeListing(listing);
-			$.failedTokenListings[listing.owner] = listing;
-		}
-
+		TokenListing memory listing = $.participatedListings[_campaignId][
+			msg.sender
+		];
 		if (listing.pairedToken == address(0)) {
 			// Handle GainzSwap ILO refund
 			payable(msg.sender).transfer(amount);
@@ -704,6 +697,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 			listing.pairedToken.sendFungibleToken(amount, msg.sender);
 		}
 
+		_removeCampaignFromUserCampaigns(msg.sender, _campaignId);
 		emit RefundIssued(_campaignId, msg.sender, amount);
 	}
 
@@ -765,6 +759,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		MainStorage storage $ = _getMainStorage();
 
 		$.userCampaigns[user].remove(campaignId);
+		delete $.participatedListings[campaignId][user];
 	}
 
 	function campaigns(
@@ -787,7 +782,14 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 	function pairListing(
 		address pairOwner
 	) external view returns (TokenListing memory) {
-		return _getMainStorage().activeTokenListings[pairOwner];
+		return _getMainStorage().pairListing[pairOwner];
+	}
+
+	function participatedListings(
+		uint256 campaignId,
+		address participant
+	) external view returns (TokenListing memory) {
+		return _getMainStorage().participatedListings[campaignId][participant];
 	}
 
 	function allowedPairedTokens() external view returns (address[] memory) {
