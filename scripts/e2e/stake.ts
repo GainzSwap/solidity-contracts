@@ -11,6 +11,7 @@ import {
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { getAddress, ZeroAddress } from "ethers";
 import { slippageErrors } from "./errors";
+import { execSwap } from "./swap";
 
 export default async function stake(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\nStaking");
@@ -38,11 +39,11 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
       continue;
     }
 
-    const slippage = BigInt(randomNumber(1, 100).toFixed());
+    const slippage = BigInt(randomNumber(1, 300).toFixed());
     const _100Percent = 1000n;
     const applySlippage = (amount: bigint) => (amount * _100Percent) / (_100Percent - slippage);
 
-    const { amount: amountInA } = await getAmount(account, tokenA, ethers, wnative);
+    const { amount: amountInA, isNative: aIsNative } = await getAmount(account, tokenA, ethers, wnative);
     if (amountInA == 0n) continue;
     const amountOutMinA = applySlippage(amountInA);
     const amountInB = await views.getQuote(amountInA, [tokenA, tokenB]);
@@ -51,7 +52,7 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
 
     if (amountOutMinA < 1n || amountOutMinB < 1n) continue;
 
-    console.log(account.address, "Staking", { tokenA, tokenB });
+    console.log(account.address, "Staking");
 
     for (const [address, amount] of [
       [tokenA, amountInA],
@@ -62,27 +63,20 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
       await token.connect(account).approve(governance, 2n ** 251n);
     }
 
-    const value = randomNumber(0, 100) >= 55 ? undefined : aIsWNative ? amountInA : bIsWNative ? amountInB : undefined;
-
-    const isBTokenBalEnough = async () => {
-      const bTokenBal = await (value && bIsWNative
-        ? ethers.provider.getBalance(account.address)
-        : (await ethers.getContractAt("ERC20", tokenB)).balanceOf(account));
-
-      return bTokenBal > amountInB;
-    };
-
+    const isBTokenBalEnough = async () =>
+      (await (await ethers.getContractAt("ERC20", tokenB)).balanceOf(account)) > amountInB;
     if (!(await isBTokenBalEnough())) {
       try {
-        await router
-          .connect(account)
-          .swapExactTokensForTokens(
-            amountInA,
-            amountInB,
-            findBestPath([tokenA, tokenB])!,
-            account,
-            Number.MAX_SAFE_INTEGER,
-          );
+        await execSwap({
+          amountIn: amountInA,
+          ethers,
+          isNative: aIsNative,
+          router,
+          swapPath: findBestPath([tokenA, tokenB]),
+          tester: account,
+          tokenIn: tokenA,
+          views,
+        });
 
         if (!(await isBTokenBalEnough())) {
           console.log("Failed to stake due to b amount", account.address);
@@ -105,7 +99,7 @@ export default async function stake(hre: HardhatRuntimeEnvironment, accounts: Ha
             randomNumber(0, 1081),
             [amountOutMinA, amountOutMinB, Number.MAX_SAFE_INTEGER],
             pathToNative,
-            { value },
+            { value: aIsNative ? amountInA : undefined },
           ),
       [...slippageErrors],
     );

@@ -279,7 +279,7 @@ export const runInErrorBoundry = async (cb: Function, acceptedErrStrings: string
       throw error;
     }
 
-    console.log(error);
+    console.log(cb.name, "Failed");
   }
 };
 
