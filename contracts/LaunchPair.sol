@@ -214,6 +214,11 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 
 		Router router = Router(payable($.router));
 		$.dEDU = router.getWrappedNativeToken();
+
+		uint256 balance = address(this).balance;
+		if (balance > 0) {
+			payable($.dEDU).transfer(balance);
+		}
 	}
 
 	function addAllowedPairedToken(
@@ -692,7 +697,7 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		];
 		if (listing.pairedToken == address(0)) {
 			// Handle GainzSwap ILO refund
-			payable(msg.sender).transfer(amount);
+			$.dEDU.sendFungibleToken(amount, msg.sender);
 		} else {
 			listing.pairedToken.sendFungibleToken(amount, msg.sender);
 		}
