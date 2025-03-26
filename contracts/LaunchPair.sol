@@ -215,9 +215,13 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		Router router = Router(payable($.router));
 		$.dEDU = router.getWrappedNativeToken();
 
+		// Handle GainzSwap ILO state
 		uint256 balance = address(this).balance;
 		if (balance > 0) {
 			payable($.dEDU).transfer(balance);
+		}
+		if ($.campaignCount == 0) {
+			$.campaignCount = 1;
 		}
 	}
 
