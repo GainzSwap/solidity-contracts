@@ -28,6 +28,7 @@ import "./scripts/reBalancePool";
 import "./scripts/semOnePoints";
 import "./scripts/createERC20";
 import "./scripts/listGainz";
+import "./scripts/removeLiqFees";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY!;
