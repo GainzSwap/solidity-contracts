@@ -109,7 +109,7 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
         getRandomItem(await launchPair.allowedPairedTokens()),
         goal,
         days(+randomNumber(30, 40).toFixed(0)),
-        randomNumber(90,1080)
+        randomNumber(90, 1080),
       );
   }
 });

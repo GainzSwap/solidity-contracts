@@ -216,7 +216,9 @@ contract LaunchPair is OwnableUpgradeable, ERC1155HolderUpgradeable, Errors {
 		$.dEDU = router.getWrappedNativeToken();
 
 		// Handle GainzSwap ILO state
-		(bool success, ) = payable($.dEDU).call{ value: address(this).balance }("");
+		(bool success, ) = payable($.dEDU).call{ value: address(this).balance }(
+			""
+		);
 		require(success, "Failed to deposit");
 	}
 
