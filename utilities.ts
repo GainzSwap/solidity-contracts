@@ -163,7 +163,9 @@ export async function getSwapTokens(router: Router, ethers: typeof e) {
   const makePath = (pair: string) => pair.split(joiner);
   const tradePairs: ReturnType<typeof makePair>[] = [];
 
-  for (const address of await router.pairs()) {
+  const pairs = await router.pairs();
+
+  for (const address of pairs) {
     const pair = await ethers.getContractAt("Pair", address);
     const token0 = await pair.token0();
     const token1 = await pair.token1();
@@ -214,6 +216,7 @@ export async function getSwapTokens(router: Router, ethers: typeof e) {
   }
 
   return {
+    pairs,
     swapTokens: Array.from(swapTokens),
     tradePairs,
     makePair,

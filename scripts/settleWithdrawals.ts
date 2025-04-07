@@ -32,7 +32,7 @@ task("settleWithdrawals").setAction(async (_, hre) => {
   // }
 
   {
-    const pendingWithdrawal = await wNative.pendingWithdrawals();
+    const pendingWithdrawal = (await wNative.pendingWithdrawals()) - (await ethers.provider.getBalance(wNative));
     const balance = await ethers.provider.getBalance(feeTo);
     console.log({ pendingWithdrawal: formatEther(pendingWithdrawal) });
     if (pendingWithdrawal > 0n) {
@@ -53,4 +53,8 @@ task("settleWithdrawals").setAction(async (_, hre) => {
       console.log("Stake hash", tx.hash);
     }
   }
+
+  const treasuryBalanceDelta =
+    (await wedu.balanceOf("0x68Fe50235230e24f17c90f8Fb0Cd4626fbD34972")) - (await wNative.totalSupply());
+  console.log("treasuryBalanceDelta", formatEther(treasuryBalanceDelta));
 });
