@@ -31,6 +31,7 @@ import "./scripts/listGainz";
 import "./scripts/removeLiqFees";
 import "./scripts/unStake";
 import "./scripts/txMetrics";
+import "./scripts/pointsAccrual";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY!;
