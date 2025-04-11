@@ -6,6 +6,20 @@ import { getRandomItem, randomNumber, runInErrorBoundry } from "../../utilities"
 export default async function transferToken(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\ntransferToken");
 
+  for (const account of accounts) {
+    const sendTo = getRandomItem(
+      hre.network.name == "localhost" ? await hre.getUnnamedAccounts() : accounts.map(a => a.address),
+    );
+    await sendRandToken(account, sendTo, hre);
+  }
+}
+
+export const sendRandToken = async (
+  account: HardhatEthersSigner,
+  sendTo: string,
+  hre: HardhatRuntimeEnvironment,
+  nonce_?: number,
+) => {
   const { ethers } = hre;
   const { deployer } = await hre.getNamedAccounts();
 
@@ -18,25 +32,29 @@ export default async function transferToken(hre: HardhatRuntimeEnvironment, acco
 
   const token = getRandomItem([gainz, wnative, gToken]);
 
-  for (const account of accounts) {
-    const sendTo = getRandomItem(await hre.getUnnamedAccounts());
-    console.log(`Transferring ${await token.name()} from ${account.address} to ${sendTo}`);
-    if (token == gToken) {
-      const bals = await gToken.getGTokenBalance(account);
-      if (!bals.length) continue;
-      const { nonce, amount } = getRandomItem(bals);
+  console.log(`Transferring ${await token.name()} from ${account.address} to ${sendTo}`);
 
-      await runInErrorBoundry(
-        () => gToken.connect(account).safeTransferFrom(account, sendTo, nonce, amount, Buffer.from("")),
-        ["SFT: Must transfer all"],
-      );
-    } else {
-      const amount = await (token as typeof gainz).balanceOf(account.address).then(bal => {
-        const randBal = Math.floor(Math.random() * +bal.toString());
-        return BigInt(randBal) / 10_000n;
-      });
+  if (token == gToken) {
+    const bals = await gToken.getGTokenBalance(account);
+    if (!bals.length) return;
+    const bal = bals.find(bal => bal.attributes.epochsLocked == 0n);
+    if (!bal) return;
+    const { nonce, amount } = bal;
 
-      await wnative.connect(account).transfer(sendTo, amount);
-    }
+    await runInErrorBoundry(
+      () =>
+        gToken.connect(account).split(nonce, [account.address, sendTo], [(amount * 98n) / 100n, (amount * 2n) / 100n], {
+          nonce: nonce_,
+        }),
+      // : gToken.connect(account).safeTransferFrom(account, sendTo, nonce, amount, Buffer.from(""))
+      ["SFT: Must transfer all"],
+    );
+  } else {
+    const amount = await (token as typeof gainz).balanceOf(account.address).then(bal => {
+      const randBal = Math.floor(Math.random() * +bal.toString());
+      return BigInt(randBal) / 100n;
+    });
+
+    await wnative.connect(account).transfer(sendTo, amount, { nonce: nonce_ });
   }
-}
+};
