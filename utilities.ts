@@ -254,7 +254,7 @@ export async function getAmount(
     ? await ethers.provider.getBalance(account)
     : await (await ethers.getContractAt("ERC20", token)).balanceOf(account);
 
-  let amount = BigInt(randomNumber(10e5, 100e18));
+  let amount = BigInt(randomNumber(10e5, 1e15));
   if (amount > balance) {
     amount = (balance * 9n) / 10n; // Use 90% of balance if small
   }
@@ -287,3 +287,18 @@ export const runInErrorBoundry = async (cb: Function, acceptedErrStrings: string
 };
 
 export const isAddressEqual = (a: string, b: string) => getAddress(a) === getAddress(b);
+
+
+/**
+ * Shuffles an array in place using the Fisher–Yates algorithm.
+ * @param array - The array to shuffle.
+ * @returns The shuffled array.
+ */
+export function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array]; // Optional: copy to avoid mutating original
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
