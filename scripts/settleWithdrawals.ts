@@ -14,12 +14,12 @@ task("settleWithdrawals").setAction(async (_, hre) => {
   const WEDU = "0xd02E8c38a8E3db71f8b2ae30B8186d7874934e12";
   const wedu = await ethers.getContractAt("WNTV", WEDU);
   // {
-  //   const reBalancePoolEDUAmt = await wNative.balanceOf(deployer);
-  //   if (reBalancePoolEDUAmt <= 0n) return;
+  //   const reBalancePoolEDUAmt = parseEther("500");// await wNative.balanceOf(deployer);
+  //   // if (reBalancePoolEDUAmt <= 0n) return;
 
-  //   await wNative.transfer(feeTo, reBalancePoolEDUAmt);
+  //   // await wNative.transfer(feeTo, reBalancePoolEDUAmt);
 
-  //   // await wedu.connect(feeTo).withdraw(reBalancePoolEDUAmt);
+  //   await wedu.connect(feeTo).withdraw(reBalancePoolEDUAmt);
 
   //   const { hash } = await feeTo.sendTransaction({
   //     value: reBalancePoolEDUAmt,
@@ -32,14 +32,20 @@ task("settleWithdrawals").setAction(async (_, hre) => {
   // }
 
   {
-    const pendingWithdrawal = (await wNative.pendingWithdrawals()) - (await ethers.provider.getBalance(wNative));
+    const caBal = await ethers.provider.getBalance(wNative);
+    const pendingWithdrawal = await wNative.pendingWithdrawals();
     const balance = await ethers.provider.getBalance(feeTo);
-    console.log({ pendingWithdrawal: formatEther(pendingWithdrawal) });
-    if (pendingWithdrawal > 0n) {
-      if (balance < pendingWithdrawal) {
-        await wedu.connect(feeTo).withdraw(pendingWithdrawal);
+    console.log({
+      pendingWithdrawal: formatEther(pendingWithdrawal),
+      caBal: formatEther(caBal),
+      delta: formatEther(caBal - pendingWithdrawal),
+    });
+    if (pendingWithdrawal > caBal) {
+      const amountToWithdraw = pendingWithdrawal - caBal;
+      if (balance < amountToWithdraw) {
+        await wedu.connect(feeTo).withdraw(amountToWithdraw);
       }
-      await wNative.connect(feeTo).settleWithdrawals({ value: pendingWithdrawal });
+      await wNative.connect(feeTo).settleWithdrawals({ value: amountToWithdraw });
     }
   }
   {
