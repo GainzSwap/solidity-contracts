@@ -38,14 +38,12 @@ task("settleWithdrawals").setAction(async (_, hre) => {
     console.log({
       pendingWithdrawal: formatEther(pendingWithdrawal),
       caBal: formatEther(caBal),
-      delta: formatEther(caBal - pendingWithdrawal),
     });
-    if (pendingWithdrawal > caBal) {
-      const amountToWithdraw = pendingWithdrawal - caBal;
-      if (balance < amountToWithdraw) {
-        await wedu.connect(feeTo).withdraw(amountToWithdraw);
+    if (pendingWithdrawal > 0n) {
+      if (balance < pendingWithdrawal) {
+        await wedu.connect(feeTo).withdraw(pendingWithdrawal);
       }
-      await wNative.connect(feeTo).settleWithdrawals({ value: amountToWithdraw });
+      await wNative.connect(feeTo).settleWithdrawals({ value: pendingWithdrawal });
     }
   }
   {

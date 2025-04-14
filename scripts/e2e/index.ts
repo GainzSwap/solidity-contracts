@@ -264,7 +264,7 @@ task("e2e", "").setAction(async (_, hre) => {
           const bal = await hre.ethers.provider.getBalance(account.address);
 
           // Fund the account if the balance is below the threshold
-          if (bal < parseEther("0.000001")) {
+          if (bal < parseEther("0.0001")) {
             console.log(`Funding ${account.address}`);
             feeTo
               .sendTransaction({
