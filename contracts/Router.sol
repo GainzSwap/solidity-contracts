@@ -43,18 +43,15 @@ library RouterLib {
 		for (uint i; i < path.length - 1; i++) {
 			(address input, address output) = (path[i], path[i + 1]);
 			uint amount0Out;
-			uint feePercent0;
 			uint amount1Out;
-			uint feePercent1;
 
 			{
 				(address token0, ) = AMMLibrary.sortTokens(input, output);
 				uint amountOut = amounts[i + 1][0];
 				uint feePercent = amounts[i + 1][1];
-				(amount0Out, feePercent0, amount1Out, feePercent1) = input ==
-					token0
-					? (uint(0), uint(0), amountOut, feePercent)
-					: (amountOut, feePercent, uint(0), uint(0));
+				(amount0Out, amount1Out) = input == token0
+					? (uint(0), amountOut)
+					: (amountOut, uint(0));
 
 				emit IRouter.Swap(_to, input, output, amountOut, feePercent);
 			}
@@ -68,7 +65,7 @@ library RouterLib {
 				)
 				: _to;
 			IPair(AMMLibrary.pairFor(address(this), pairsBeacon, input, output))
-				.swap(amount0Out, feePercent0, amount1Out, feePercent1, to);
+				.swap(amount0Out, amount1Out, to);
 		}
 	}
 
