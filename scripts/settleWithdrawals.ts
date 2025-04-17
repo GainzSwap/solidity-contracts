@@ -13,23 +13,6 @@ task("settleWithdrawals").setAction(async (_, hre) => {
 
   const WEDU = "0xd02E8c38a8E3db71f8b2ae30B8186d7874934e12";
   const wedu = await ethers.getContractAt("WNTV", WEDU);
-  // {
-  //   const reBalancePoolEDUAmt = parseEther("500");// await wNative.balanceOf(deployer);
-  //   // if (reBalancePoolEDUAmt <= 0n) return;
-
-  //   // await wNative.transfer(feeTo, reBalancePoolEDUAmt);
-
-  //   await wedu.connect(feeTo).withdraw(reBalancePoolEDUAmt);
-
-  //   const { hash } = await feeTo.sendTransaction({
-  //     value: reBalancePoolEDUAmt,
-  //     to: "0x8D0739d9D0d49aFCF8d101416cD2759Bf8922013",
-  //   });
-
-  //   console.log("reBalancePoolEDUAmt hash", hash);
-
-  //   return;
-  // }
 
   {
     const caBal = await ethers.provider.getBalance(wNative);
