@@ -65,12 +65,12 @@ library AMMLibrary {
 			"AMMLibrary: INSUFFICIENT_LIQUIDITY"
 		);
 
-		feeData[1] = Pair(pair).calculateFeePercent(amountIn, reserveIn);
-
-		uint amountInWithFee = amountIn * (100_00 - feeData[1]);
-		uint numerator = amountInWithFee * reserveOut;
-		uint denominator = (reserveIn * 100_00) + amountInWithFee;
+		uint numerator = amountIn * reserveOut;
+		uint denominator = reserveIn + amountIn;
 		feeData[0] = numerator / denominator;
+
+		// This now calculates fee on the *output*, not input
+		feeData[1] = Pair(pair).calculateFeePercent(feeData[0], reserveOut);
 	}
 
 	// given an output amount of an asset and pair reserves, returns a required input amount of the other asset
@@ -86,10 +86,15 @@ library AMMLibrary {
 			"AMMLibrary: INSUFFICIENT_LIQUIDITY"
 		);
 
+		// 1. Fee is calculated on the amountOut (gross)
 		feeData[1] = Pair(pair).calculateFeePercent(amountOut, reserveOut);
 
-		uint numerator = reserveIn * amountOut * 100_00;
-		uint denominator = (reserveOut - amountOut) * (100_00 - feeData[1]);
+		// 2. Adjust for fee to get the **effective/gross** amountOut
+		uint netAmountOut = (amountOut * (10_000 - feeData[1])) / 10_000;
+
+		// 3. Use net amountOut in formula to calculate amountIn
+		uint numerator = reserveIn * netAmountOut;
+		uint denominator = reserveOut - netAmountOut;
 		feeData[0] = (numerator / denominator) + 1;
 	}
 
