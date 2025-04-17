@@ -524,15 +524,27 @@ contract Governance is ERC1155HolderUpgradeable, OwnableUpgradeable, Errors {
 			);
 	}
 
+	/**
+	 * @dev Calculates the emission-adjusted reward reserve and reward-per-share.
+	 *      This function is typically called when new rewards are being distributed to stakers.
+	 * @param amount The raw reward amount to be distributed (e.g. native token like ETH/BNB).
+	 * @param totalStakeWeight The total weight across all active stakers (based on stake + boost, etc).
+	 * @return _rewardsReserve The scaled reward based on bonding curve logic using `WNTV.scaleEmission`.
+	 * @return _rewardPerShare The reward per unit weight (Q128 fixed-point format).
+	 */
 	function _addGainzMint(
 		uint amount,
 		uint256 totalStakeWeight
-	) private pure returns (uint _rewardsReserve, uint _rewardPerShare) {
+	) private view returns (uint _rewardsReserve, uint _rewardPerShare) {
 		if (totalStakeWeight > 0) {
-			// Update the rewards reserve
-			_rewardsReserve = amount;
+			// Apply emission scaling based on current dEDU supply relative to its target
+			_rewardsReserve = WNTV(
+				payable(_getGovernanceStorage().wNativeToken)
+			).scaleEmission(amount);
+
+			// Calculate how much reward each share receives in Q128 fixed point
 			_rewardPerShare = FullMath.mulDiv(
-				amount,
+				_rewardsReserve,
 				FixedPoint128.Q128,
 				totalStakeWeight
 			);

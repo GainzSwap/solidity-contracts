@@ -160,6 +160,118 @@ contract WNTVTest is Test {
 		wntv.withdrawETHBalance(payable(address(this)));
 	}
 
+	function testSetTargetSupply(uint256 target) public {
+		vm.assume(target > 0);
+
+		wntv.setTargetSupply(target);
+
+		assertEq(wntv.getTargetSupply(), target);
+	}
+
+	function testSetTargetSupply_RevertIfZero() public {
+		vm.expectRevert("Target must be > 0");
+		wntv.setTargetSupply(0);
+	}
+
+	function testScaleEmission_ZeroSupply() public {
+		uint256 amount = 100 ether;
+
+		wntv.setTargetSupply(1_000 ether);
+
+		uint256 scaled = wntv.scaleEmission(amount);
+		assertEq(scaled, 0);
+	}
+
+	function testScaleEmission_ZeroTarget() public view {
+		uint256 amount = 100 ether;
+
+		uint256 scaled = wntv.scaleEmission(amount);
+		assertEq(scaled, 0);
+	}
+
+	function testScaleEmission_FullTargetSupply() public {
+		uint256 target = 1_000 ether;
+		uint256 amount = 100 ether;
+
+		address user = makeAddr("user");
+
+		wntv.setTargetSupply(target);
+
+		vm.deal(user, target);
+		vm.prank(user);
+		wntv.receiveFor{ value: target }(user);
+
+		uint256 scaled = wntv.scaleEmission(amount);
+
+		assertEq(scaled, amount);
+		assertGt(scaled, 0);
+	}
+
+	function testScaleEmission_OverTargetSupply() public {
+		uint256 target = 1_000 ether;
+		uint256 amount = 100 ether;
+		address user = makeAddr("user");
+
+		wntv.setTargetSupply(target);
+
+		vm.deal(user, 2_000 ether);
+		vm.prank(user);
+		wntv.receiveFor{ value: 2_000 ether }(user);
+
+		uint256 scaled = wntv.scaleEmission(amount);
+
+		assertEq(scaled, amount);
+		assertGt(scaled, 0);
+	}
+
+	function testScaleEmission_UnderTargetSupply() public {
+		uint256 target = 2_000 ether;
+		uint256 amount = 100 ether;
+		address user = makeAddr("user");
+
+		wntv.setTargetSupply(target);
+
+		vm.deal(user, 500 ether);
+		vm.prank(user);
+		wntv.receiveFor{ value: 500 ether }(user);
+
+		uint256 scaled = wntv.scaleEmission(amount);
+
+		assertLt(scaled, amount);
+		assertGt(scaled, 0);
+	}
+
+	function testFuzz_ScaleEmission(uint256 supply, uint256 amount) public {
+		vm.assume(supply > 0 && supply < 1_000_000 ether);
+		vm.assume(amount > 0 && amount < 1_000 ether);
+		address user = makeAddr("user");
+
+		wntv.setTargetSupply(1_000_000 ether);
+
+		vm.deal(user, supply);
+		vm.prank(user);
+		wntv.receiveFor{ value: supply }(user);
+
+		uint256 scaled = wntv.scaleEmission(amount);
+
+		assertLe(scaled, amount);
+	}
+
+	function testFuzz_TargetAndSupply(uint256 target, uint256 supply) public {
+		target = bound(target, 1, 1_000_000 ether);
+		supply = bound(supply, 1, 2_000_000 ether);
+		address user = makeAddr("user");
+
+		wntv.setTargetSupply(target);
+
+		vm.deal(user, supply);
+		vm.prank(user);
+		wntv.receiveFor{ value: supply }(user);
+
+		uint256 scaled = wntv.scaleEmission(100 ether);
+		assertLe(scaled, 100 ether);
+	}
+
 	function _sendETHToContract(uint256 amount) internal {
 		vm.deal(address(wntv), amount);
 	}
