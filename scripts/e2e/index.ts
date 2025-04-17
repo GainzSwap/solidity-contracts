@@ -201,9 +201,17 @@ function createMainnetActionFactory(actions: (typeof swap)[]) {
 // });
 
 task("e2e", "").setAction(async (_, hre) => {
-  const actions = shuffleArray(
-    extendArray([swap], 180), //new Array(5).fill(0).map(_ => swap); //
-  );
+  const actions = shuffleArray([
+    stake,
+    swap,
+    fundCampaign,
+    claimRewards,
+    delegate,
+    unDelegate,
+    transferToken,
+    unStake,
+    completeCampaign,
+  ]);
   const isLocalhost = hre.network.name == "localhost";
   const [startIndex, endIndex] = isLocalhost ? [4, 30] : [0, 2000];
   const accounts = isLocalhost
@@ -261,41 +269,41 @@ task("e2e", "").setAction(async (_, hre) => {
           //   }
           // }
 
-          const bal = await hre.ethers.provider.getBalance(account.address);
-
-          // Fund the account if the balance is below the threshold
-          if (bal < parseEther("0.0001")) {
-            console.log(`Funding ${account.address}`);
-            feeTo
-              .sendTransaction({
-                to: account.address,
-                value: parseEther("0.01"),
-                nonce: ++nonce,
-              })
-              .catch(e => {
-                console.error(e);
-                const state = getStateFromError(e.message);
-                if (state) {
-                  nonce = state;
-                } else {
-                  nonce--;
-                }
-              });
-          }
+          await hre.ethers.provider.getBalance(account.address).then(async bal => {
+            // Fund the account if the balance is below the threshold
+            if (bal < parseEther("0.001")) {
+              console.log(`Funding ${account.address}`);
+              return feeTo
+                .sendTransaction({
+                  to: account.address,
+                  value: parseEther("0.01"),
+                  nonce: ++nonce,
+                })
+                .catch(e => {
+                  console.error(e);
+                  const state = getStateFromError(e.message);
+                  if (state) {
+                    nonce = state;
+                  } else {
+                    nonce--;
+                  }
+                });
+            }
+          });
           // Randomly send tokens with a 30% chance
-          if (Math.random() > 0.7) {
-            sendRandToken(feeTo, account.address, hre, ++nonce).catch(e => {
-              console.error(e);
-              const state = getStateFromError(e.message);
-              if (state) {
-                nonce = state;
-              } else {
-                nonce--;
-              }
-            });
-          }
+          // if (Math.random() > 0.7) {
+          //  await sendRandToken(feeTo, account.address, hre, ++nonce).catch(e => {
+          //     console.error(e);
+          //     const state = getStateFromError(e.message);
+          //     if (state) {
+          //       nonce = state;
+          //     } else {
+          //       nonce--;
+          //     }
+          //   });
+          // }
 
-          action(hre, [account]).catch(console.error);
+          // action(hre, [account]).catch(console.error);
         }
 
         actionInstances.push(() => action(hre, selectedAccounts));

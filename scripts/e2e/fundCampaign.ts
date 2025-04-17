@@ -21,14 +21,14 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
   const minContribution = parseEther("1");
 
   for (const campaignId of campaignIds) {
-    const { deadline, creator } = await launchPair.getCampaignDetails(campaignId);
+    const { deadline, creator, } = await launchPair.getCampaignDetails(campaignId);
     if (deadline <= (await time.latest())) continue;
     const { pairedToken } = await launchPair.pairListing(creator);
 
     for (const account of accounts) {
       const { amount, isNative } = await getAmount(account, pairedToken, hre.ethers, wNative).then(
-        ({ amount, isNative }) => {
-          if (amount < minContribution) return { amount: 0n, isNative };
+        ({ amount, isNative, balance }) => {
+          if (amount < minContribution) return { amount: minContribution > balance ? 0 : minContribution, isNative };
 
           return { amount, isNative };
         },

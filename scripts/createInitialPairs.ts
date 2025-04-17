@@ -1,7 +1,7 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { Gainz, Router, Views } from "../typechain-types";
-import { parseEther, ZeroAddress } from "ethers";
+import { parseEther, parseUnits, ZeroAddress } from "ethers";
 import { createERC20, CreateERC20Type } from "./createERC20";
 import { getRandomItem, getSwapTokens, isAddressEqual, randomNumber } from "../utilities";
 import { days } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
@@ -41,28 +41,13 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
     );
   }
 
-  for (let index = 1; index <= 5; index++) {
-    const { tokenAddress } = await createERC20(
-      { decimals: randomNumber(0, 18).toFixed(0), name: `${index} Token`, symbol: `${index}TK` },
-      hre,
-    );
-    const { selectTokens } = await getSwapTokens(router, ethers);
-    const { tokenIn } = selectTokens();
-    await hre.run("createPair", {
-      tokenA: tokenAddress,
-      amountA: "0.035",
-      tokenB: tokenIn,
-      amountB: "0.0034",
-    });
-  }
-
   const views = await ethers.getContract<Views>("Views", deployer);
 
   const listingLiqValue = await launchPair.minLiqValueForListing();
 
   const ILOs: CreateERC20Type[] = [
     { name: "Book Spine", symbol: "BKSP", decimals: "18" },
-    { name: "Grasp Academy", symbol: "GRASP", decimals: "18" },
+    { name: "Grasp Academy", symbol: "GRASP", decimals: "9" },
     { name: "Owlbert Eistein", decimals: "2", symbol: "EMC2" },
     { name: "Capy Friends", decimals: "8", symbol: "Yuzu" },
   ];
@@ -94,7 +79,10 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
 
     console.log("\nLaunching ILO", { tokenAddress, tokenName, tokenSymbol }, "\n\n");
 
-    const lpAmount = (await token.balanceOf(deployer)) / 2n;
+    const lpAmount = parseUnits(
+      randomNumber(34_000, 21_000_000).toFixed(+createParams.decimals),
+      +createParams.decimals,
+    );
     const goal = parseEther(randomNumber(35_000, 270_000).toFixed(18));
 
     await token.mint(signer, lpAmount);

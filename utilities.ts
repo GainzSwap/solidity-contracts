@@ -242,24 +242,19 @@ export async function getSwapTokens(router: Router, ethers: typeof e) {
   };
 }
 
-export async function getAmount(
-  account: HardhatEthersSigner,
-  token: string,
-  ethers: typeof e,
-  wNative: string,
-): Promise<{ amount: bigint; isNative: boolean }> {
+export async function getAmount(account: HardhatEthersSigner, token: string, ethers: typeof e, wNative: string) {
   const isNative = isAddressEqual(token, ZeroAddress) || (isAddressEqual(token, wNative) && randomNumber(0, 100) >= 55);
 
   const balance = isNative
     ? await ethers.provider.getBalance(account)
     : await (await ethers.getContractAt("ERC20", token)).balanceOf(account);
 
-  let amount = BigInt(randomNumber(10e5, 1e15));
+  let amount = BigInt(randomNumber(1e15, 100e18));
   if (amount > balance) {
     amount = (balance * 9n) / 10n; // Use 90% of balance if small
   }
 
-  return { amount, isNative };
+  return { amount, isNative, balance };
 }
 
 export function computePriceOracleAddr(routerAddress: string) {
@@ -287,7 +282,6 @@ export const runInErrorBoundry = async (cb: Function, acceptedErrStrings: string
 };
 
 export const isAddressEqual = (a: string, b: string) => getAddress(a) === getAddress(b);
-
 
 /**
  * Shuffles an array in place using the Fisher–Yates algorithm.

@@ -31,30 +31,31 @@ export const sendRandToken = async (
   const gToken = await ethers.getContractAt("GToken", await governance.getGToken());
 
   const token = getRandomItem([gainz, wnative, gToken]);
+  const isERC20 = (t: any): t is typeof gainz => "transfer" in t;
 
   console.log(`Transferring ${await token.name()} from ${account.address} to ${sendTo}`);
 
-  if (token == gToken) {
+  if (!isERC20(token)) {
     const bals = await gToken.getGTokenBalance(account);
     if (!bals.length) return;
-    const bal = bals.find(bal => bal.attributes.epochsLocked == 0n);
+    const bal = getRandomItem(bals); // bals.find(bal => bal.attributes.epochsLocked == 0n);
     if (!bal) return;
     const { nonce, amount } = bal;
 
     await runInErrorBoundry(
       () =>
-        gToken.connect(account).split(nonce, [account.address, sendTo], [(amount * 98n) / 100n, (amount * 2n) / 100n], {
-          nonce: nonce_,
-        }),
-      // : gToken.connect(account).safeTransferFrom(account, sendTo, nonce, amount, Buffer.from(""))
+        // gToken.connect(account).split(nonce, [account.address, sendTo], [(amount * 98n) / 100n, (amount * 2n) / 100n], {
+        //   nonce: nonce_,
+        // }),
+        gToken.connect(account).safeTransferFrom(account, sendTo, nonce, amount, Buffer.from("")),
       ["SFT: Must transfer all"],
     );
   } else {
-    const amount = await (token as typeof gainz).balanceOf(account.address).then(bal => {
+    const amount = await token.balanceOf(account.address).then(bal => {
       const randBal = Math.floor(Math.random() * +bal.toString());
       return BigInt(randBal) / 100n;
     });
 
-    await wnative.connect(account).transfer(sendTo, amount, { nonce: nonce_ });
+    await token.connect(account).transfer(sendTo, amount, { nonce: nonce_ });
   }
 };

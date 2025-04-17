@@ -108,11 +108,11 @@ task("pointsAccrual", "")
       // new Date("2025-04-04T04:20:59Z")
     )
       .then(stats => {
+        console.log("Records:");
+        console.table(stats.records.reverse(), ["action", "pointsAccrued"]);
         console.log("Date:", stats.date);
         console.log("Total Accrued Points:", stats.totalAccruedPoints);
         console.log("Current Daily Accrual Rate:", stats.currentTotalPointsPerDay);
-        console.log("Records:");
-        console.table(stats.records, ["action", "pointsAccrued"]);
       })
       .catch(console.error);
   });

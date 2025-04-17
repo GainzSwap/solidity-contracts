@@ -18,15 +18,17 @@ task("settleWithdrawals").setAction(async (_, hre) => {
     const caBal = await ethers.provider.getBalance(wNative);
     const pendingWithdrawal = await wNative.pendingWithdrawals();
     const balance = await ethers.provider.getBalance(feeTo);
+    const delta = pendingWithdrawal - caBal;
     console.log({
       pendingWithdrawal: formatEther(pendingWithdrawal),
       caBal: formatEther(caBal),
+      delta: formatEther(delta),
     });
-    if (pendingWithdrawal > 0n) {
-      if (balance < pendingWithdrawal) {
-        await wedu.connect(feeTo).withdraw(pendingWithdrawal);
+    if (delta > 0n) {
+      if (balance < delta) {
+        await wedu.connect(feeTo).withdraw(delta);
       }
-      await wNative.connect(feeTo).settleWithdrawals({ value: pendingWithdrawal });
+      await wNative.connect(feeTo).settleWithdrawals({ value: delta });
     }
   }
   {

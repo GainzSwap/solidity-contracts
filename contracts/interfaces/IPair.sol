@@ -42,9 +42,7 @@ interface IPair {
 
 	function swap(
 		uint amount0Out,
-		uint feeAmount0,
 		uint amount1Out,
-		uint feeAmount1,
 		address to
 	) external;
 

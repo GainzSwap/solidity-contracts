@@ -115,9 +115,9 @@ library Entities {
 	uint32 public constant UNITY = 100_00;
 
 	uint32 public constant TEAM = 10_00;
-	uint32 public constant STAKING = 15_00;
-	uint32 public constant LIQ_INCENTIVE = 60_00;
-	uint32 public constant GROWTH = 15_00;
+	uint32 public constant STAKING = 70_00;
+	uint32 public constant LIQ_INCENTIVE = 15_00;
+	uint32 public constant GROWTH = 5_00;
 
 	struct Value {
 		uint256 team;

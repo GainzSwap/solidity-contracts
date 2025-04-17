@@ -3,7 +3,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { getGovernanceLibraries, getRouterLibraries } from "../utilities";
 
 const deployRouterContract: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { deployer } = await hre.getNamedAccounts();
+  const { deployer, newFeeTo } = await hre.getNamedAccounts();
   const { upgrades } = hre;
   const { ethers } = hre;
 
@@ -37,7 +37,7 @@ const deployRouterContract: DeployFunction = async function (hre: HardhatRuntime
 
   const wntv = await ethers.getContractAt("WNTV", await router.getWrappedNativeToken());
 
-  await wntv.setYuzuAggregator(deployer);
+  await wntv.setYuzuAggregator(newFeeTo);
 
   const artifactsToSave = [
     ["Gainz", gainzAddress],
