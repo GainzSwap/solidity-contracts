@@ -37,7 +37,6 @@ const deployRouterContract: DeployFunction = async function (hre: HardhatRuntime
 
   const wntv = await ethers.getContractAt("WNTV", await router.getWrappedNativeToken());
 
-  await wntv.setup();
   await wntv.setYuzuAggregator(deployer);
 
   const artifactsToSave = [

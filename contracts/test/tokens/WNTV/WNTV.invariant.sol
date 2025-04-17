@@ -57,7 +57,6 @@ contract Handler is CommonBase, StdCheats, StdUtils {
 		weth = _weth;
 
 		weth.initialize(address(this));
-		weth.setup();
 		weth.setYuzuAggregator(yuzuAggregator);
 
 		deal(address(this), ETH_SUPPLY);

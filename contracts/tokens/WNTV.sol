@@ -7,21 +7,9 @@ import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/O
 /// @title WNTV (Delegated EDU)
 /// @notice GainzSwap's delegated EDU staking mechanism. Also powers EDU liquidity on the DEX
 contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
-	struct UserWithdrawal {
-		uint256 amount;
-		uint256 readyTimestamp;
-	}
-
-	/// @custom:storage-location erc7201:gainz.tokens.WNTV.storage
-	struct WNTVStore {
-		address payable yuzuAggregator;
-		mapping(address => UserWithdrawal) withdrawals;
-		uint256 pendingWithdrawals;
-	}
-
-	/// @dev keccak256(abi.encode(uint256(keccak256("gainz.tokens.WNTV.storage")) - 1)) & ~bytes32(uint256(0xff));
-	bytes32 private constant WNTV_STORAGE_SLOT =
-		0x9c939a4b05ceda8b86db186f0245ad77465dc7a372c22a1f429a973574185700;
+	// ----------------------------------
+	// EVENTS
+	// ----------------------------------
 
 	/// @dev Emitted when a user deposits native tokens to receive WNTV.
 	event Deposited(address indexed user, uint256 amount);
@@ -39,11 +27,35 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 	/// @dev Emitted when Yuzu aggregator is updated.
 	event YuzuAggregatorUpdated(address indexed aggregator);
 
+	// ----------------------------------
+	// STRUCTS & STORAGE
+	// ----------------------------------
+
+	struct UserWithdrawal {
+		uint256 amount;
+		uint256 readyTimestamp;
+	}
+
+	/// @custom:storage-location erc7201:gainz.tokens.WNTV.storage
+	struct WNTVStore {
+		address payable yuzuAggregator;
+		mapping(address => UserWithdrawal) withdrawals;
+		uint256 pendingWithdrawals;
+	}
+
+	/// @dev Storage slot constant for upgradeable storage layout
+	bytes32 private constant WNTV_STORAGE_SLOT =
+		0x9c939a4b05ceda8b86db186f0245ad77465dc7a372c22a1f429a973574185700;
+
 	function _getWNTVStorage() private pure returns (WNTVStore storage $) {
 		assembly {
 			$.slot := WNTV_STORAGE_SLOT
 		}
 	}
+
+	// ----------------------------------
+	// INITIALIZATION
+	// ----------------------------------
 
 	/// @notice Initializes the contract and sets token metadata.
 	function initialize(address initialOwner) public initializer {
@@ -51,33 +63,41 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 		__Ownable_init(initialOwner);
 	}
 
-	/// @notice Sets the contract owner after deployment.
-	/// @dev this is neccessary as the contract was not ownable when initially deployed
-	/// 	  This should be removed in the next upgrade
-	function setup() external onlyOwner {
-		ERC20Upgradeable.ERC20Storage storage erc20Storage;
-		assembly {
-			erc20Storage.slot := 0x52c63247e1f47db19d5ce0460030c497f067ca4cebf71ba98eeadabe20bace00
-		}
-
-		erc20Storage._name = "Delegated EDU";
-		erc20Storage._symbol = "dEDU";
-	}
+	// ----------------------------------
+	// OWNER-ONLY FUNCTIONS
+	// ----------------------------------
 
 	/// @notice Sets the Yuzu aggregator address.
-	/// @param _yuzuAggregator The address of the Yuzu aggregator.
 	function setYuzuAggregator(address _yuzuAggregator) external onlyOwner {
 		_getWNTVStorage().yuzuAggregator = payable(_yuzuAggregator);
 		emit YuzuAggregatorUpdated(_yuzuAggregator);
 	}
 
-	/// @notice Settles pending withdrawals by reducing the pending amount.
-	function settleWithdrawals() external payable {
-		_getWNTVStorage().pendingWithdrawals -= msg.value;
+	/// @notice Allows the contract owner to withdraw ETH balance.
+	function withdrawETHBalance(address payable to) external onlyOwner {
+		uint256 balance = address(this).balance;
+		require(balance > 0, "No ETH to withdraw");
+
+		(bool success, ) = to.call{ value: balance }("");
+		require(success, "ETH withdraw failed");
+	}
+
+	// ----------------------------------
+	// PUBLIC / EXTERNAL FUNCTIONS
+	// ----------------------------------
+
+	/// @notice Deposits native tokens and approves a spender to use them.
+	function receiveForSpender(address owner, address spender) public payable {
+		_stakeEDU(owner);
+		_approve(owner, spender, msg.value);
+	}
+
+	/// @notice Deposits native tokens and mints WNTV tokens for the sender.
+	function receiveFor(address owner) public payable {
+		_stakeEDU(owner);
 	}
 
 	/// @notice Initiates a withdrawal request for WNTV tokens.
-	/// @param amount The amount of WNTV tokens to withdraw.
 	function withdraw(uint256 amount) public {
 		require(balanceOf(msg.sender) >= amount, "WNTV: Insufficient balance");
 		_burn(msg.sender, amount);
@@ -114,22 +134,21 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 		emit WithdrawalCompleted(msg.sender, amount);
 	}
 
-	/// @notice Deposits native tokens and approves a spender to use them.
-	/// @param owner The address receiving the WNTV tokens.
-	/// @param spender The address allowed to spend the tokens.
-	function receiveForSpender(address owner, address spender) public payable {
-		_stakeEDU(owner);
-		_approve(owner, spender, msg.value);
+	/// @notice Settles pending withdrawals by reducing the pending amount.
+	function settleWithdrawals() external payable {
+		_getWNTVStorage().pendingWithdrawals -= msg.value;
 	}
 
-	/// @notice Deposits native tokens and mints WNTV tokens for the sender.
-	/// @param owner The recipient of the minted WNTV tokens.
-	function receiveFor(address owner) public payable {
-		_stakeEDU(owner);
+	/// @notice Allows direct deposits of native tokens.
+	receive() external payable {
+		_stakeEDU(msg.sender);
 	}
+
+	// ----------------------------------
+	// INTERNAL FUNCTIONS
+	// ----------------------------------
 
 	/// @dev Stakes native tokens with the Yuzu aggregator and mints WNTV tokens.
-	/// @param depositor The address receiving the WNTV tokens.
 	function _stakeEDU(address depositor) internal {
 		address yuzuAggregator_ = _getWNTVStorage().yuzuAggregator;
 		require(yuzuAggregator_ != address(0), "yuzuAggregator not set");
@@ -140,6 +159,10 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 		_mint(depositor, msg.value);
 		emit Deposited(depositor, msg.value);
 	}
+
+	// ----------------------------------
+	// VIEW FUNCTIONS
+	// ----------------------------------
 
 	/// @notice Returns the address of the Yuzu aggregator.
 	function yuzuAggregator() external view returns (address) {
@@ -152,15 +175,9 @@ contract WNTV is ERC20Upgradeable, OwnableUpgradeable {
 	}
 
 	/// @notice Returns a user's pending withdrawals.
-	/// @param user The address of the user.
 	function userPendingWithdrawals(
 		address user
 	) external view returns (UserWithdrawal memory) {
 		return _getWNTVStorage().withdrawals[user];
-	}
-
-	/// @notice Allows direct deposits of native tokens.
-	receive() external payable {
-		_stakeEDU(msg.sender);
 	}
 }

@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import { Test } from "forge-std/Test.sol";
 import { Test } from "forge-std/Test.sol";
 import { WNTV } from "../../../tokens/WNTV.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract WNTVTest is Test {
 	WNTV wntv;
@@ -11,7 +12,6 @@ contract WNTVTest is Test {
 	function setUp() external {
 		wntv = new WNTV();
 		wntv.initialize(address(this));
-		wntv.setup();
 		wntv.setYuzuAggregator(address(this));
 	}
 
@@ -114,6 +114,54 @@ contract WNTVTest is Test {
 			amount,
 			"Owner should have the balance"
 		);
+	}
+
+	function testOwnerCanWithdrawETH() external {
+		uint256 ethToSend = 10 ether;
+
+		_sendETHToContract(ethToSend);
+
+		uint256 ownerInitial = address(this).balance;
+
+		wntv.withdrawETHBalance(payable(address(this)));
+
+		assertEq(
+			address(wntv).balance,
+			0,
+			"Contract ETH balance should be zero"
+		);
+		assertEq(
+			address(this).balance,
+			ownerInitial + ethToSend,
+			"Owner did not receive withdrawn ETH"
+		);
+	}
+
+	function testWithdrawETHFailsIfNotOwner(address payable attacker) external {
+		vm.assume(attacker != address(0) && attacker != address(this));
+
+		_sendETHToContract(5 ether);
+
+		vm.prank(attacker);
+		vm.expectRevert(
+			abi.encodeWithSelector(
+				OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+				attacker
+			)
+		);
+		wntv.withdrawETHBalance(attacker);
+	}
+
+	function testWithdrawETHRevertsIfEmpty() external {
+		// No ETH in contract
+		assertEq(address(wntv).balance, 0);
+
+		vm.expectRevert("No ETH to withdraw");
+		wntv.withdrawETHBalance(payable(address(this)));
+	}
+
+	function _sendETHToContract(uint256 amount) internal {
+		vm.deal(address(wntv), amount);
 	}
 
 	function _checkWNTVBalance() internal view {
