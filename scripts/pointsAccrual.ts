@@ -42,7 +42,7 @@ type WalletStats = {
 };
 
 async function fetchActivityPage(walletAddress: string, page: number): Promise<ActivityResponse> {
-  const url = `https://www.gainzswap.xyz/api/user/${walletAddress}/activityLog?timezone=Africa/Lagos&page=${page}`;
+  const url = `http://localhost:3000/api/user/${walletAddress}/activityLog?timezone=Africa/Lagos&page=${page}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -73,7 +73,6 @@ export async function computeWalletPoints(walletAddress: string, asOfDate: Date 
 
         const ratePerSecond = parseFloat(record.pointsRatePerSecond);
         const accruedPoints = (ratePerSecond * secondsElapsed) / 10 ** 18;
-        if(accruedPoints < 0) continue;
 
         totalAccruedPoints += accruedPoints;
         currentTotalPointsPerDay += record.pointsPerDay;
