@@ -40,11 +40,7 @@ interface IPair {
 		address to
 	) external returns (uint256 amount0, uint256 amount1);
 
-	function swap(
-		uint amount0Out,
-		uint amount1Out,
-		address to
-	) external;
+	function swap(uint amount0Out, uint amount1Out, address to) external;
 
 	function initialize(address, address) external;
 }

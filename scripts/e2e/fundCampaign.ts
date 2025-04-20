@@ -21,7 +21,7 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
   const minContribution = parseEther("1");
 
   for (const campaignId of campaignIds) {
-    const { deadline, creator, } = await launchPair.getCampaignDetails(campaignId);
+    const { deadline, creator } = await launchPair.getCampaignDetails(campaignId);
     if (deadline <= (await time.latest())) continue;
     const { pairedToken } = await launchPair.pairListing(creator);
 
@@ -37,7 +37,7 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
 
       const value = isNative ? amount : undefined;
       if (!value) {
-        await (await ethers.getContractAt("ERC20", pairedToken)).connect(account).approve(launchPair , 2n ** 251n);
+        await (await ethers.getContractAt("ERC20", pairedToken)).connect(account).approve(launchPair, 2n ** 251n);
       }
 
       await launchPair.connect(account).contribute({ nonce: 0, amount, token: pairedToken }, campaignId, { value });
