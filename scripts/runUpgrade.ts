@@ -1,7 +1,7 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { Gainz, Router } from "../typechain-types";
-import { getGovernanceLibraries, getRouterLibraries, getSwapTokens, sleep } from "../utilities";
+import { computePriceOracleAddr, getGovernanceLibraries, getRouterLibraries, sleep } from "../utilities";
 import { parseEther, ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 
@@ -53,7 +53,15 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   // Libraries
   console.log("Deploying Libraries");
   const govLibs = await getGovernanceLibraries(hre.ethers);
-  const routerLibs = await getRouterLibraries(hre.ethers, govLibs);
+  const { routerLibs, AMMLibrary } = await getRouterLibraries(hre.ethers, govLibs);
+
+  const Views = await hre.ethers.getContractFactory("Views", {
+    libraries: {
+      AMMLibrary,
+    },
+  });
+  const views = await Views.deploy(routerAddress, await router.getPairsBeacon());
+  await views.waitForDeployment();
 
   // Router
   console.log("Upgrading Router");
@@ -92,12 +100,17 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   await hre.upgrades.upgradeBeacon(pairBeacon, await pairFactory(), { redeployImplementation: "always" });
   console.log("Pair beacon upgraded successfully.");
 
+  const oracleAddr = computePriceOracleAddr(routerAddress);
+  const priceOracle = await hre.ethers.getContractAt("PriceOracle", oracleAddr);
+
   console.log("\nSaving artifacts");
   for (const [contract, address] of [
     ["Gainz", gainzAddress],
     ["WNTV", wntvAddr],
     ["Router", routerAddress],
     ["Governance", govAddress],
+    ["PriceOracle", oracleAddr],
+    ["Views", await views.getAddress()],
     ["Pair", ZeroAddress],
   ]) {
     const { abi, metadata } = await hre.deployments.getExtendedArtifact(contract);
@@ -107,9 +120,13 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   // Run any additional tasks, such as generating TypeScript ABIs
   await hre.deployments.run("generateTsAbis");
 
-  const { pairs } = await getSwapTokens(router, ethers);
+  console.log("Adding Pairs to Oracle");
+  await sleep(5_000);
+  const pairs = await router.pairs();
   for (const pairAddr of pairs) {
+    await priceOracle.addPair(pairAddr);
     const pair = await ethers.getContractAt("Pair", pairAddr);
     await pair.resetFee();
+    console.log("Added", { pairAddr, oracleAddr });
   }
 });
