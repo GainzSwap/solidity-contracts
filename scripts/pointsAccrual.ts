@@ -103,7 +103,8 @@ task("pointsAccrual", "")
 
     console.log("Fetching points for address:", address);
 
-    await computeWalletPoints(address, 
+    await computeWalletPoints(
+      address,
       // new Date("2025-04-04T04:20:59Z")
     )
       .then(stats => {

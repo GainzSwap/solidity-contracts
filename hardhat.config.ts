@@ -32,7 +32,6 @@ import "./scripts/removeLiqFees";
 import "./scripts/unStake";
 import "./scripts/txMetrics";
 import "./scripts/pointsAccrual";
-import "./scripts/withdrawETHfromDEDU";
 import "./scripts/setTargetEDUSupply";
 
 // If not set, it uses the hardhat account 0 private key.
