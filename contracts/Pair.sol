@@ -185,7 +185,9 @@ contract Pair is IPair, PairERC20, OwnableUpgradeable {
 	}
 
 	/// @notice Reset fee bounds to defaults
-	function resetFee() external onlyOwner {
+	function resetFee()
+		external
+	/* TODO add this modifier later, did this for simpler upgrade onlyOwner */ {
 		PairStorage storage $ = _getPairStorage();
 		$.minFee = MINIMUM_FEE;
 		$.maxFee = MAXIMUM_FEE;
