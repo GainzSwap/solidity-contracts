@@ -37,7 +37,7 @@ export default async function fundCampaign(hre: HardhatRuntimeEnvironment, accou
 
       const value = isNative ? amount : undefined;
       if (!value) {
-        await (await ethers.getContractAt("ERC20", pairedToken)).connect(account).approve(launchPair, amount);
+        await (await ethers.getContractAt("ERC20", pairedToken)).connect(account).approve(launchPair , 2n ** 251n);
       }
 
       await launchPair.connect(account).contribute({ nonce: 0, amount, token: pairedToken }, campaignId, { value });

@@ -3,7 +3,6 @@ import { task } from "hardhat/config";
 import { Gainz, Router } from "../typechain-types";
 import { computePriceOracleAddr, getGovernanceLibraries, getRouterLibraries, sleep } from "../utilities";
 import { parseEther, ZeroAddress } from "ethers";
-import { ethers } from "hardhat";
 
 task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   const { deployer } = await hre.getNamedAccounts();
