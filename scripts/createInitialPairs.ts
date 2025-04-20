@@ -26,6 +26,8 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
   const launchPair = await ethers.getContractAt("LaunchPair", launchPairAddress);
   await launchPair.acquireOwnership();
 
+  await hre.run("setTargetEDUSupply", { target: "1" });
+
   await hre.run("listGainz");
 
   await hre.run("deployERC20", {
