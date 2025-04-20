@@ -124,7 +124,7 @@ task("runUpgrade", "Upgrades updated contracts").setAction(async (_, hre) => {
   const pairs = await router.pairs();
   for (const pairAddr of pairs) {
     await priceOracle.addPair(pairAddr);
-    const pair = await ethers.getContractAt("Pair", pairAddr);
+    const pair = await hre.ethers.getContractAt("Pair", pairAddr);
     await pair.resetFee();
     console.log("Added", { pairAddr, oracleAddr });
   }
