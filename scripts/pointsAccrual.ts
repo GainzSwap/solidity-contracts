@@ -42,7 +42,7 @@ type WalletStats = {
 };
 
 async function fetchActivityPage(walletAddress: string, page: number): Promise<ActivityResponse> {
-  const url = `http://localhost:3000/api/user/${walletAddress}/activityLog?timezone=Africa/Lagos&page=${page}`;
+  const url = `http://www.gainzswap.xyz/api/user/${walletAddress}/activityLog?timezone=Africa/Lagos&page=${page}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -76,10 +76,14 @@ export async function computeWalletPoints(walletAddress: string, asOfDate: Date 
 
         totalAccruedPoints += accruedPoints;
         currentTotalPointsPerDay += record.pointsPerDay;
-        records.push({
+
+        const value = {
           action: record.action.title,
           pointsAccrued: accruedPoints,
-        });
+        };
+        records.push(value);
+
+        if (value.pointsAccrued > 10) console.log({ value, record },'\n');
       }
     });
 
@@ -109,7 +113,7 @@ task("pointsAccrual", "")
     )
       .then(stats => {
         console.log("Records:");
-        console.table(stats.records.reverse(), ["action", "pointsAccrued"]);
+        // console.table(stats.records.reverse(), ["action", "pointsAccrued"]);
         console.log("Date:", stats.date);
         console.log("Total Accrued Points:", stats.totalAccruedPoints);
         console.log("Current Daily Accrual Rate:", stats.currentTotalPointsPerDay);

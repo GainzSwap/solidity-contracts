@@ -24,7 +24,7 @@ import "./scripts/runUpgrade";
 import "./scripts/entityFund";
 import "./scripts/createHDWallet";
 import "./scripts/settleWithdrawals";
-import "./scripts/reBalancePool";
+import "./scripts/teamTokens";
 import "./scripts/semOnePoints";
 import "./scripts/createERC20";
 import "./scripts/listGainz";

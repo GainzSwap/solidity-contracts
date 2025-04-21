@@ -54,7 +54,6 @@ scripts/
 ├── deployERC20.ts           # Deploy custom ERC20 tokens
 ├── pointsAccrual.ts         # Script to test points logic
 ├── moveTime.ts              # Helper for time manipulation
-├── reBalancePool.ts         # Liquidity rebalancing
 ├── unStake.ts               # Unstaking flow
 ├── ... (many more utils for testing + admin ops)
 ```
