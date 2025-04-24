@@ -1,20 +1,22 @@
 import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import { Gainz, Router, Views } from "../typechain-types";
-import { parseEther, parseUnits, ZeroAddress } from "ethers";
+import { formatEther, formatUnits, parseEther, parseUnits, ZeroAddress } from "ethers";
 import { createERC20, CreateERC20Type } from "./createERC20";
-import { getRandomItem, getSwapTokens, isAddressEqual, randomNumber } from "../utilities";
+import { getAmount, getRandomItem, getSwapTokens, isAddressEqual, randomNumber } from "../utilities";
 import { days } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 
 task("createInitialPairs", "").setAction(async (_, hre) => {
   const { ethers } = hre;
   const { deployer } = await hre.getNamedAccounts();
+  const deployerSigner = await ethers.getSigner(deployer);
 
   const gainz = await ethers.getContract<Gainz>("Gainz", deployer);
   const gainzAddress = await gainz.getAddress();
 
   const router = await ethers.getContract<Router>("Router", deployer);
   const wNativeToken = await router.getWrappedNativeToken();
+  const wntv = await ethers.getContractAt("WNTV", wNativeToken);
 
   const governanceAddress = await router.getGovernance();
   const governance = await ethers.getContractAt("Governance", governanceAddress);
@@ -43,14 +45,37 @@ task("createInitialPairs", "").setAction(async (_, hre) => {
     );
   }
 
+  await wntv.receiveFor(deployer, { value: parseEther("300") });
+  for (const [tokenSymbol, tokenName] of [
+    ["GRASP", "Grasp Academy"],
+    ["WISER", "Daily Wiser"],
+    ["ESD", "EDU Stable Dollar"],
+  ]) {
+    const tokenADecimals = randomNumber(2, 18).toFixed(0);
+    const { tokenAddress: tokenA } = await createERC20(
+      { decimals: tokenADecimals, name: tokenName, symbol: tokenSymbol },
+      hre,
+    );
+    const { selectTokens } = await getSwapTokens(router, ethers);
+    const { tokenIn: tokenB } = selectTokens();
+
+    // const { amount: amountB } = await getAmount(deployerSigner, tokenB, ethers, wNativeToken);
+    // const { amount: amountA } = await getAmount(deployerSigner, tokenA, ethers, wNativeToken);
+
+    await hre.run("createPair", {
+      tokenA,
+      amountA: "0.035",
+      tokenB,
+      amountB: "0.0034",
+    });
+  }
+
   const views = await ethers.getContract<Views>("Views", deployer);
 
   const listingLiqValue = await launchPair.minLiqValueForListing();
 
   const ILOs: CreateERC20Type[] = [
     { name: "Book Spine", symbol: "BKSP", decimals: "18" },
-    { name: "Grasp Academy", symbol: "GRASP", decimals: "9" },
-    { name: "Owlbert Eistein", decimals: "2", symbol: "EMC2" },
     { name: "Capy Friends", decimals: "8", symbol: "Yuzu" },
   ];
   const signers = (await ethers.getSigners()).slice(0, ILOs.length).reverse();
