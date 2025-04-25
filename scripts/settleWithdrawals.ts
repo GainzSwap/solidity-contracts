@@ -6,7 +6,7 @@ import axios from "axios";
 import { sleep } from "../utilities";
 
 task("settleWithdrawals")
-  .addOptionalParam("watch", "Watch the contract for pending withdrawals")
+  .addFlag("watch", "Watch the contract for pending withdrawals")
   .setAction(async ({ watch }, hre) => {
     const { ethers } = hre;
     const indexerApi = process.env.INDEXER_API;
@@ -28,14 +28,14 @@ task("settleWithdrawals")
         const caBal = await ethers.provider.getBalance(wNative);
         const pendingWithdrawal = await wNative.pendingWithdrawals();
         const pendingWithdrawalTimeRange = await axios
-          .get(indexerApi + "/withdrawals/pending?within=36000")
+          .get(indexerApi + "/withdrawals/pending?within=3600")
           .then(({ data }) => BigInt(data.timeRangePendingAmount));
         const balance = await ethers.provider.getBalance(feeTo);
 
-        let delta = pendingWithdrawalTimeRange - caBal;
-        if (delta < 0n && pendingWithdrawalTimeRange > 0n && caBal < pendingWithdrawal) {
-          delta = pendingWithdrawal - caBal;
-        }
+        const delta =
+          pendingWithdrawal > pendingWithdrawalTimeRange
+            ? pendingWithdrawalTimeRange - pendingWithdrawal
+            : pendingWithdrawal;
 
         console.log({
           pendingWithdrawal: formatEther(pendingWithdrawal),
