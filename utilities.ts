@@ -99,7 +99,17 @@ async function saveLibraries(libraries: Record<string, string>, contractName: st
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Router } from "./typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { getAddress, getCreate2Address, keccak256, solidityPackedKeccak256, ZeroAddress } from "ethers";
+import {
+  getAddress,
+  getCreate2Address,
+  HDNodeWallet,
+  keccak256,
+  parseEther,
+  Provider,
+  Signer,
+  solidityPackedKeccak256,
+  ZeroAddress,
+} from "ethers";
 
 export async function getDeploymentTxHashFromNetwork(
   hre: HardhatRuntimeEnvironment,
@@ -308,7 +318,7 @@ export function sequentialRun(account: HardhatEthersSigner, cb: (account: Hardha
   return new Promise<void>(async resolve => {
     const address = account.address;
 
-    console.log("Waiting for account", address, cb.name);
+    sequentialAccounts[address] && console.log("Waiting for account", address, cb.name);
     while (sequentialAccounts[address]) {
       await sleep(1000);
     }
@@ -319,7 +329,7 @@ export function sequentialRun(account: HardhatEthersSigner, cb: (account: Hardha
     } catch (error) {
       console.error("Error in sequentialRun:", error);
     } finally {
-      sequentialAccounts[address] = false;
+      delete sequentialAccounts[address];
     }
 
     console.log("Finished sequentialRun", address, cb.name);
@@ -328,10 +338,47 @@ export function sequentialRun(account: HardhatEthersSigner, cb: (account: Hardha
   });
 }
 
-function extendArray<T>(baseArray: T[], targetLength: number): T[] {
+export function extendArray<T>(baseArray: T[], targetLength: number): T[] {
   const extended = [...baseArray];
   while (extended.length < targetLength) {
     extended.push(getRandomItem(baseArray));
   }
   return extended;
+}
+
+export function getStateFromError(errorMessage: string): number | null {
+  const match = errorMessage.match(/state:\s*(\d+)/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+export function deriveHDWallet(phrase: string, index: number): HDNodeWallet {
+  const hdNode = HDNodeWallet.fromPhrase(phrase);
+  return hdNode.deriveChild(index);
+}
+
+export async function fundIfNeeded(
+  provider: Provider,
+  account: HardhatEthersSigner,
+  funder: Signer,
+  nonce: number,
+): Promise<number> {
+  const balance = await provider.getBalance(account.address);
+
+  if (balance < parseEther("0.0001")) {
+    console.log(`Funding ${account.address}`);
+    try {
+      await funder.sendTransaction({
+        to: account.address,
+        value: parseEther("0.01"),
+        nonce: nonce || undefined,
+      });
+      return nonce + 1;
+    } catch (e: any) {
+      console.error(e);
+      const recovered = getStateFromError(e.message);
+      return recovered ?? nonce;
+    }
+  }
+
+  return nonce;
 }
