@@ -222,7 +222,7 @@ export async function getSwapTokens(router: Router, ethers: typeof e) {
     makePair,
     makePath,
     selectTokens: () => {
-      const tokens = Array.from(swapTokens);
+      const tokens = shuffleArray(Array.from(swapTokens));
 
       if (tokens.length < 2) {
         throw new Error("Not enough tokens to select tokenIn and tokenOut");
@@ -244,17 +244,23 @@ export async function getSwapTokens(router: Router, ethers: typeof e) {
 
 export async function getAmount(account: HardhatEthersSigner, token: string, ethers: typeof e, wNative: string) {
   const isNative = isAddressEqual(token, ZeroAddress) || (isAddressEqual(token, wNative) && randomNumber(0, 100) >= 55);
+  let decimals = 18n;
 
   const balance = isNative
     ? await ethers.provider.getBalance(account)
-    : await (await ethers.getContractAt("ERC20", token)).balanceOf(account);
+    : await (async () => {
+        const tokenContract = await ethers.getContractAt("ERC20", token);
+        const balance = await tokenContract.balanceOf(account.address);
+        decimals = await tokenContract.decimals();
+        return balance;
+      })();
 
   let amount = BigInt(randomNumber(1e15, 100e18));
   if (amount > balance) {
     amount = (balance * 9n) / 10n; // Use 90% of balance if small
   }
 
-  return { amount, isNative, balance };
+  return { amount, isNative, balance, decimals };
 }
 
 export function computePriceOracleAddr(routerAddress: string) {
@@ -295,4 +301,37 @@ export function shuffleArray<T>(array: T[]): T[] {
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
+}
+
+const sequentialAccounts: Record<string, boolean> = {};
+export function sequentialRun(account: HardhatEthersSigner, cb: (account: HardhatEthersSigner) => Promise<void>) {
+  return new Promise<void>(async resolve => {
+    const address = account.address;
+
+    console.log("Waiting for account", address, cb.name);
+    while (sequentialAccounts[address]) {
+      await sleep(1000);
+    }
+
+    sequentialAccounts[address] = true;
+    try {
+      await cb(account);
+    } catch (error) {
+      console.error("Error in sequentialRun:", error);
+    } finally {
+      sequentialAccounts[address] = false;
+    }
+
+    console.log("Finished sequentialRun", address, cb.name);
+
+    resolve();
+  });
+}
+
+function extendArray<T>(baseArray: T[], targetLength: number): T[] {
+  const extended = [...baseArray];
+  while (extended.length < targetLength) {
+    extended.push(getRandomItem(baseArray));
+  }
+  return extended;
 }
