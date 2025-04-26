@@ -1,7 +1,9 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Router, Views } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+
 import {
+  fundIfNeeded,
   getAmount,
   getSwapTokens,
   isAddressEqual,
@@ -13,7 +15,7 @@ import { slippageErrors } from "./errors";
 import { sendToken } from "./transferToken";
 import { formatUnits, parseUnits } from "ethers";
 
-export default async function swap(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
+export default async function swap(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[], fund = false) {
   console.log("Swapping");
   const { ethers } = hre;
   const { deployer } = await hre.getNamedAccounts();
@@ -40,28 +42,44 @@ export default async function swap(hre: HardhatRuntimeEnvironment, accounts: Har
           tester,
           views,
           isNative,
+          decimals,
         });
 
       let report = await run();
-      if (report.includes("Low amount to swap")) {
+      if (report.includes("Low amount to swap") && fund) {
         const { newFeeTo } = await hre.getNamedAccounts();
         const feeTo = await hre.ethers.getSigner(newFeeTo);
 
-        if (amountIn < 10_000n) {
-          amountIn = parseUnits("0.01", decimals);
+        if (amountIn < minAmountIn(decimals)) {
+          amountIn = minAmountIn(decimals);
         }
 
         await sequentialRun(feeTo, async seqAcc => {
           let rerun = false;
           do {
             try {
-              await sendToken(await ethers.getContractAt("ERC20", tokenIn), amountIn, seqAcc, tester.address);
+              await fundIfNeeded(
+                hre.ethers.provider,
+                tester,
+                seqAcc,
+                await hre.ethers.provider.getTransactionCount(seqAcc),
+              );
+              !isNative &&
+                (await sendToken(
+                  await ethers.getContractAt("ERC20", tokenIn),
+                  parseUnits("0.01", decimals),
+                  seqAcc,
+                  tester.address,
+                ));
+              rerun = false;
             } catch (error) {
-              // const err = error?.toString();
-              // if (err?.includes("nonce too low") || err?.includes("nonce too high")) {
-              //   rerun = true;
-              //   console.log("Rerun sendToken", tester.address, tokenIn, amountIn);
-              // }
+              const err = error?.toString();
+              if (err?.includes("nonce too low") || err?.includes("nonce too high")) {
+                rerun = true;
+                console.log("Rerun sendToken", tester.address, tokenIn, amountIn);
+              } else {
+                rerun = false;
+              }
             }
           } while (rerun);
         });
@@ -69,10 +87,12 @@ export default async function swap(hre: HardhatRuntimeEnvironment, accounts: Har
         report = await run();
       }
 
-      console.log(tester.address, ...report, formatUnits(amountIn, decimals), tokenIn, tokenOut);
+      console.log(tester.address, ...report, { amountIn: formatUnits(amountIn, decimals), tokenIn, tokenOut });
     }),
   );
 }
+
+const minAmountIn = (decimals: bigint) => parseUnits("0.000000001", decimals);
 
 export async function execSwap({
   swapPath,
@@ -83,26 +103,32 @@ export async function execSwap({
   tester,
   views,
   isNative,
+  decimals,
 }: {
   swapPath: string[] | null;
   amountIn: bigint;
   tokenIn: string;
   router: Router;
-  ethers: any;
+  ethers: HardhatRuntimeEnvironment["ethers"];
   tester: HardhatEthersSigner;
   views: Views;
   isNative: boolean;
+  decimals: bigint;
 }) {
   if (!swapPath || swapPath.length < 2 || !isAddressEqual(tokenIn, swapPath[0])) return "Invalid swap path";
 
-  if (amountIn <= 10_000n) return "Low amount to swap";
+  if (amountIn < minAmountIn(decimals)) return "Low amount to swap";
 
   const token0 = await ethers.getContractAt("ERC20", tokenIn);
-  await token0.connect(tester).approve(router, 2n ** 251n);
+  if ((await token0.allowance(tester.address, router)) < amountIn) {
+    await token0.connect(tester).approve(router, 2n ** 251n);
+  }
 
   const maxOutAmount = await views.getQuote(amountIn, swapPath);
-  const minAmountOut = (maxOutAmount * 1000n) / (BigInt(randomNumber(1, 10).toFixed()) * 1000n);
-  if (minAmountOut < 1n) return "Low min amount out";
+  let minAmountOut = (maxOutAmount * 1000n) / (BigInt(randomNumber(1, 10).toFixed()) * 1000n);
+  if (minAmountOut < 1n) {
+    minAmountOut = 1n;
+  }
 
   const args = [amountIn, minAmountOut, swapPath, tester.address, Number.MAX_SAFE_INTEGER] as const;
   const RouterLib = require("../../verification/libs/localhost/Router.js");
