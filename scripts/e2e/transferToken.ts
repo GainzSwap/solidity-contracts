@@ -1,8 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { Gainz, GToken, Router, WNTV } from "../../typechain-types";
+import { ERC20, Gainz, GToken, Router } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { getRandomItem, randomNumber, runInErrorBoundry } from "../../utilities";
-import { BigNumberish } from "ethers";
+import { getRandomItem } from "../../utilities";
 
 export default async function transferToken(hre: HardhatRuntimeEnvironment, accounts: HardhatEthersSigner[]) {
   console.log("\ntransferToken");
@@ -30,10 +29,11 @@ export const sendRandToken = async (account: HardhatEthersSigner, sendTo: string
 };
 
 export const sendToken = async (
-  token: Gainz | WNTV | GToken,
+  token: ERC20 | GToken,
+  amount: bigint,
   account: HardhatEthersSigner,
   sendTo: string,
-  gTokenNonce?: BigNumberish,
+  gTokenNonce?: number,
 ) => {
   const isGToken = (t: any): t is GToken => "split" in t;
 
@@ -49,15 +49,9 @@ export const sendToken = async (
         })();
 
     if (!bal) return;
-    const { nonce, amount } = bal;
 
-    return token.connect(account).safeTransferFrom(account, sendTo, nonce, amount, Buffer.from(""));
+    return token.connect(account).safeTransferFrom(account, sendTo, bal.nonce, bal.amount, Buffer.from(""));
   } else {
-    const amount = await token.balanceOf(account.address).then(bal => {
-      const randBal = Math.floor(Math.random() * +bal.toString());
-      return BigInt(randBal) / 100n;
-    });
-
     return token.connect(account).transfer(sendTo, amount);
   }
 };
