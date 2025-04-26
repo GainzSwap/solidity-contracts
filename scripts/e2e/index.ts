@@ -2,7 +2,15 @@ import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import swap from "./swap";
 import stake from "./stake";
-import { randomNumber, sequentialRun, shuffleArray, sleep } from "../../utilities";
+import {
+  deriveHDWallet,
+  extendArray,
+  fundIfNeeded,
+  randomNumber,
+  sequentialRun,
+  shuffleArray,
+  sleep,
+} from "../../utilities";
 import fundCampaign from "./fundCampaign";
 import claimRewards from "./claimRewards";
 import delegate from "./delegate";
@@ -16,43 +24,6 @@ import { HDNodeWallet, parseEther, Provider, Signer } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import os from "os";
-
-function getStateFromError(errorMessage: string): number | null {
-  const match = errorMessage.match(/state:\s*(\d+)/);
-  return match ? parseInt(match[1], 10) : null;
-}
-
-function deriveHDWallet(phrase: string, index: number): HDNodeWallet {
-  const hdNode = HDNodeWallet.fromPhrase(phrase);
-  return hdNode.deriveChild(index);
-}
-
-async function fundIfNeeded(
-  provider: Provider,
-  account: HardhatEthersSigner,
-  funder: Signer,
-  nonce: number,
-): Promise<number> {
-  const balance = await provider.getBalance(account.address);
-
-  if (balance < parseEther("0.0001")) {
-    console.log(`Funding ${account.address}`);
-    try {
-      await funder.sendTransaction({
-        to: account.address,
-        value: parseEther("0.01"),
-        nonce: nonce || undefined,
-      });
-      return nonce + 1;
-    } catch (e: any) {
-      console.error(e);
-      const recovered = getStateFromError(e.message);
-      return recovered ?? nonce;
-    }
-  }
-
-  return nonce;
-}
 
 task("e2e", "Run E2E tests")
   .addFlag("fund", "Fund accounts before running tests")
@@ -105,10 +76,16 @@ task("e2e", "Run E2E tests")
       return accounts.slice(accountStart, accountEnd);
     };
 
-    await Promise.all(new Array(numWorkers).fill(0).map(() => e2e(hre, fund, actions, feeTo, accounts, getSelected)));
+    const runs = Array.from({ length: numWorkers }, (_, run) =>
+      e2e(hre, fund, actions, feeTo, accounts, getSelected, run),
+    );
+
+    console.log("Starting E2E tests...", runs.length);
+    await sleep(1000);
+
+    await Promise.all(runs);
   });
 
-let runs = 0;
 async function e2e(
   hre: HardhatRuntimeEnvironment,
   fund: boolean,
@@ -116,9 +93,10 @@ async function e2e(
   feeTo: HardhatEthersSigner,
   accounts: HardhatEthersSigner[],
   getSelected: () => Promise<HardhatEthersSigner[]>,
-  isLocalhost = hre.network.name == "localhost",
+  run = 0,
 ) {
-  const run = runs++;
+  const isLocalhost = hre.network.name == "localhost";
+
   console.log("Starting E2E test", run);
   // Graceful exit handler
   const shutdown = () => {
@@ -146,57 +124,54 @@ async function e2e(
     const selected = await getSelected();
 
     try {
-      if (!Boolean(fund)) {
-        const runs = shuffleArray(actions);
+      const runs = shuffleArray(actions);
 
-        Promise.all(
-          runs
-            .map(async action => {
-              txsRunning += selected.length;
+      Promise.all(
+        runs
+          .map(async action => {
+            txsRunning += selected.length;
 
-              return selected.map(async acc => {
-                const run = () => action(hre, [acc]);
-                try {
-                  await run();
-                } catch (error: any) {
-                  if (error.toString().includes("gas + fee")) {
-                    await sequentialRun(feeTo, async seqAcc => {
-                      let rerun = false;
-                      do {
-                        try {
-                          await fundIfNeeded(
-                            hre.ethers.provider,
-                            acc,
-                            seqAcc,
-                            await hre.ethers.provider.getTransactionCount(seqAcc),
-                          );
-                        } catch (error) {
-                          // const err = error?.toString();
-                          // if (err?.includes("nonce too low") || err?.includes("nonce too high")) {
-                          //   rerun = true;
-                          //   console.log("Rerun funding", acc.address);
-                          // }
+            return selected.map(async acc => {
+              const run = () => action(hre, [acc], fund);
+              try {
+                await run();
+              } catch (error: any) {
+                if (error.toString().includes("gas + fee") && fund) {
+                  await sequentialRun(feeTo, async seqAcc => {
+                    let rerun = false;
+                    do {
+                      try {
+                        await fundIfNeeded(
+                          hre.ethers.provider,
+                          acc,
+                          seqAcc,
+                          await hre.ethers.provider.getTransactionCount(seqAcc),
+                        );
+                        rerun = false;
+                      } catch (error) {
+                        const err = error?.toString();
+                        if (err?.includes("nonce too low") || err?.includes("nonce too high")) {
+                          rerun = true;
+                          console.log("Rerun funding", acc.address);
+                        } else {
+                          rerun = false;
                         }
-                      } while (rerun);
-                    });
+                      }
+                    } while (rerun);
+                  });
 
-                    await run().catch(console.error);
-                  }
-                } finally {
-                  txsRunning -= 1;
+                  await run().catch(console.log);
                 }
-              });
-            })
-            .flatMap(x => x),
-          // .slice(0, 30),
-        ).catch(e => {
-          console.error(e);
-        });
-      } else {
-        for (const acount of shuffleArray(accounts)) {
-          await fundIfNeeded(hre.ethers.provider, acount, feeTo, 0);
-        }
-      }
+              } finally {
+                txsRunning -= 1;
+              }
+            });
+          })
+          .flatMap(x => x),
+        // .slice(0, 30),
+      ).catch(e => {
+        console.error(e);
+      });
     } catch (error: any) {
       if (
         ![
