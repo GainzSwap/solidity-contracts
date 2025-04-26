@@ -2,32 +2,24 @@ import "@nomicfoundation/hardhat-toolbox";
 import { task } from "hardhat/config";
 import swap from "./swap";
 import stake from "./stake";
-import { getRandomItem, randomNumber, shuffleArray, sleep } from "../../utilities";
+import { randomNumber, sequentialRun, shuffleArray, sleep } from "../../utilities";
 import fundCampaign from "./fundCampaign";
 import claimRewards from "./claimRewards";
 import delegate from "./delegate";
 import unDelegate from "./unDelegate";
-import transferToken, { sendToken } from "./transferToken";
+import transferToken from "./transferToken";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { seconds } from "@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time/duration";
 import unStake from "./unStake";
 import completeCampaign from "./completeCampaign";
 import { HDNodeWallet, parseEther, Provider, Signer } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { Gainz, Router } from "../../typechain-types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+import os from "os";
 
 function getStateFromError(errorMessage: string): number | null {
   const match = errorMessage.match(/state:\s*(\d+)/);
   return match ? parseInt(match[1], 10) : null;
-}
-
-function extendArray<T>(baseArray: T[], targetLength: number): T[] {
-  const extended = [...baseArray];
-  while (extended.length < targetLength) {
-    extended.push(getRandomItem(baseArray));
-  }
-  return extended;
 }
 
 function deriveHDWallet(phrase: string, index: number): HDNodeWallet {
@@ -49,6 +41,7 @@ async function fundIfNeeded(
       await funder.sendTransaction({
         to: account.address,
         value: parseEther("0.01"),
+        nonce: nonce || undefined,
       });
       return nonce + 1;
     } catch (e: any) {
@@ -61,49 +54,36 @@ async function fundIfNeeded(
   return nonce;
 }
 
-async function maybeSendRandomToken(
-  feeTo: HardhatEthersSigner,
-  recipient: string,
-  hre: HardhatRuntimeEnvironment,
-  nonce: number,
-): Promise<number> {
-  if (Math.random() > 0.55) {
-    try {
-      const { ethers } = hre;
-      const { deployer } = await hre.getNamedAccounts();
+task("e2e", "Run E2E tests")
+  .addFlag("fund", "Fund accounts before running tests")
+  .addOptionalParam("workers", "Number of worker processes to spawn", undefined)
+  .setAction(async ({ fund, workers }, hre) => {
+    const cpus = os.cpus().length;
+    const maxWorkers = Math.max(1, Math.floor(cpus / 2));
 
-      const router = await ethers.getContract<Router>("Router", deployer);
-      const gainz = await ethers.getContract<Gainz>("Gainz", deployer);
-      const wnative = await ethers.getContractAt("WNTV", await router.getWrappedNativeToken());
+    let numWorkers = workers ?? 1; // Default to 1 if not specified
 
-      await sendToken(getRandomItem([gainz, wnative]), feeTo, recipient);
-      return nonce + 1;
-    } catch (e: any) {
-      console.error(e);
-      const recovered = getStateFromError(e.message);
-      return recovered ?? nonce;
+    if (numWorkers > maxWorkers) {
+      console.log(
+        `⚠️  Requested workers (${numWorkers}) exceeds max allowed (${maxWorkers}). Using ${maxWorkers} workers.`,
+      );
+      numWorkers = maxWorkers;
     }
-  }
-  return nonce;
-}
 
-task("e2e", "")
-  .addFlag("fund")
-  .setAction(async ({ fund }, hre) => {
-    const actions = extendArray(
-      [
-        stake,
-        ...extendArray([swap], 5),
-        fundCampaign,
-        claimRewards,
-        delegate,
-        unDelegate,
-        transferToken,
-        unStake,
-        completeCampaign,
-      ],
-      30,
-    );
+    console.log(`Using ${numWorkers} worker(s)`);
+
+    const actions = [
+      stake,
+      swap,
+      fundCampaign,
+      claimRewards,
+      delegate,
+      unDelegate,
+      transferToken,
+      unStake,
+      completeCampaign,
+    ];
+
     const isLocalhost = hre.network.name == "localhost";
     const [startIndex, endIndex] = isLocalhost ? [4, 30] : [0, 3500];
 
@@ -125,68 +105,122 @@ task("e2e", "")
       return accounts.slice(accountStart, accountEnd);
     };
 
-    let txsRunning = 0;
-    while (true) {
-      if (txsRunning >= 30) {
-        console.log("Waiting for txs to finish...", txsRunning);
-        await sleep(1000);
-        continue;
-      }
+    await Promise.all(new Array(numWorkers).fill(0).map(() => e2e(hre, fund, actions, feeTo, accounts, getSelected)));
+  });
 
-      try {
-        if (!Boolean(fund)) {
-          const runs = shuffleArray(actions).slice(0, 3);
+let runs = 0;
+async function e2e(
+  hre: HardhatRuntimeEnvironment,
+  fund: boolean,
+  actions: (typeof swap)[],
+  feeTo: HardhatEthersSigner,
+  accounts: HardhatEthersSigner[],
+  getSelected: () => Promise<HardhatEthersSigner[]>,
+  isLocalhost = hre.network.name == "localhost",
+) {
+  const run = runs++;
+  console.log("Starting E2E test", run);
+  // Graceful exit handler
+  const shutdown = () => {
+    console.log(`Worker ${run} shutting down...`);
+    process.exit(0);
+  };
 
-          Promise.all(
-            runs
-              .map(async action => {
-                const selected = await getSelected();
-                txsRunning += selected.length;
-
-                return selected.map(acc =>
-                  action(hre, [acc])
-                    .catch(console.log)
-                    .finally(() => {
-                      txsRunning -= 1;
-                    }),
-                );
-              })
-              .flatMap(x => x),
-            // .slice(0, 30),
-          ).catch(e => {
-            console.error(e);
-          });
-        } else {
-          for (const account of await getSelected()) {
-            await fundIfNeeded(hre.ethers.provider, account, feeTo, 0).then(async _n =>
-              maybeSendRandomToken(feeTo, account.address, hre, _n),
-            );
-          }
-        }
-      } catch (error: any) {
-        if (
-          ![
-            "INSUFFICIENT_INPUT_AMOUNT",
-            "ECONNRESET",
-            "EADDRNOTAVAIL",
-            "other side closed",
-            "Timeout Error",
-            ...(!isLocalhost
-              ? [
-                  "execution reverted",
-                  "nonce too low",
-                  "insufficient funds for gas",
-                  "Too Many Requests error received from rpc.edu-chain.raas.gelato.cloud",
-                ]
-              : []),
-          ].some(errString => error.toString().includes(errString))
-        ) {
-          throw error;
-        }
-
-        console.log(error);
-      }
-
-      isLocalhost && (await time.increase(seconds(randomNumber(1, 3_600))));
+  // Listen for termination signals
+  process.on("SIGINT", shutdown); // ctrl+C
+  process.on("SIGTERM", shutdown); // kill or system shutdown
+  process.on("message", msg => {
+    if (msg === "shutdown") {
+      shutdown();
     }
   });
+
+  let txsRunning = 0;
+  while (true) {
+    if (txsRunning >= 30) {
+      console.log("Waiting for txs to finish...", { txsRunning, run });
+      await sleep(1000);
+      continue;
+    }
+
+    const selected = await getSelected();
+
+    try {
+      if (!Boolean(fund)) {
+        const runs = shuffleArray(actions);
+
+        Promise.all(
+          runs
+            .map(async action => {
+              txsRunning += selected.length;
+
+              return selected.map(async acc => {
+                const run = () => action(hre, [acc]);
+                try {
+                  await run();
+                } catch (error: any) {
+                  if (error.toString().includes("gas + fee")) {
+                    await sequentialRun(feeTo, async seqAcc => {
+                      let rerun = false;
+                      do {
+                        try {
+                          await fundIfNeeded(
+                            hre.ethers.provider,
+                            acc,
+                            seqAcc,
+                            await hre.ethers.provider.getTransactionCount(seqAcc),
+                          );
+                        } catch (error) {
+                          // const err = error?.toString();
+                          // if (err?.includes("nonce too low") || err?.includes("nonce too high")) {
+                          //   rerun = true;
+                          //   console.log("Rerun funding", acc.address);
+                          // }
+                        }
+                      } while (rerun);
+                    });
+
+                    await run().catch(console.error);
+                  }
+                } finally {
+                  txsRunning -= 1;
+                }
+              });
+            })
+            .flatMap(x => x),
+          // .slice(0, 30),
+        ).catch(e => {
+          console.error(e);
+        });
+      } else {
+        for (const acount of shuffleArray(accounts)) {
+          await fundIfNeeded(hre.ethers.provider, acount, feeTo, 0);
+        }
+      }
+    } catch (error: any) {
+      if (
+        ![
+          "INSUFFICIENT_INPUT_AMOUNT",
+          "ECONNRESET",
+          "EADDRNOTAVAIL",
+          "other side closed",
+          "Timeout Error",
+          ...(!isLocalhost
+            ? [
+                "execution reverted",
+                "nonce too low",
+                "insufficient funds for gas",
+                "Too Many Requests error received from rpc.edu-chain.raas.gelato.cloud",
+              ]
+            : []),
+        ].some(errString => error.toString().includes(errString))
+      ) {
+        throw error;
+      }
+
+      console.log(error);
+    }
+
+    isLocalhost && (await time.increase(seconds(randomNumber(1, 3_600))));
+  }
+}
