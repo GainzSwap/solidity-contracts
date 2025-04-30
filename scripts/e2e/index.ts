@@ -46,17 +46,19 @@ task("e2e", "Run E2E tests")
     const actions = [
       stake,
       swap,
-      fundCampaign,
-      claimRewards,
-      delegate,
-      unDelegate,
-      transferToken,
-      unStake,
-      completeCampaign,
+      swap,
+      swap,
+      // fundCampaign,
+      // claimRewards,
+      // delegate,
+      // unDelegate,
+      // transferToken,
+      // unStake,
+      // completeCampaign,
     ];
 
     const isLocalhost = hre.network.name == "localhost";
-    const [startIndex, endIndex] = isLocalhost ? [4, 30] : [0, 3500];
+    const [startIndex, endIndex] = isLocalhost ? [4, 30] : [0, 99];
 
     const accounts = isLocalhost
       ? await hre.ethers.getSigners()
@@ -69,11 +71,8 @@ task("e2e", "Run E2E tests")
 
     const { newFeeTo } = await hre.getNamedAccounts();
     const feeTo = await hre.ethers.getSigner(newFeeTo);
-    const getSelected = async () => {
-      const accountStart = randomNumber(startIndex, endIndex);
-      const accountEnd = randomNumber(accountStart + 1, accountStart + 30);
-
-      return accounts.slice(accountStart, accountEnd);
+    const getSelected = () => {
+      return shuffleArray(accounts).slice(0, Math.floor(60 / actions.length) || 1);
     };
 
     const runs = Array.from({ length: numWorkers }, (_, run) =>
@@ -92,7 +91,7 @@ async function e2e(
   actions: (typeof swap)[],
   feeTo: HardhatEthersSigner,
   accounts: HardhatEthersSigner[],
-  getSelected: () => Promise<HardhatEthersSigner[]>,
+  getSelected: () => HardhatEthersSigner[],
   run = 0,
 ) {
   const isLocalhost = hre.network.name == "localhost";
@@ -121,17 +120,14 @@ async function e2e(
       continue;
     }
 
-    const selected = await getSelected();
-
     try {
       const runs = shuffleArray(actions);
 
       Promise.all(
         runs
-          .map(async action => {
-            txsRunning += selected.length;
-
-            return selected.map(async acc => {
+          .map(action => {
+            return getSelected().map(async acc => {
+              txsRunning += 1;
               const run = () => action(hre, [acc], fund);
               try {
                 await run();
@@ -163,12 +159,13 @@ async function e2e(
                   await run().catch(console.log);
                 }
               } finally {
+                // await hre.run("pointsAccrual", { address: acc.address });
                 txsRunning -= 1;
               }
             });
           })
-          .flatMap(x => x),
-        // .slice(0, 30),
+          .flatMap(x => x)
+          .slice(0, 50),
       ).catch(e => {
         console.error(e);
       });

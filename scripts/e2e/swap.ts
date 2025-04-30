@@ -58,12 +58,7 @@ export default async function swap(hre: HardhatRuntimeEnvironment, accounts: Har
           let rerun = false;
           do {
             try {
-              await fundIfNeeded(
-                hre.ethers.provider,
-                tester,
-                seqAcc,
-                await hre.ethers.provider.getTransactionCount(seqAcc),
-              );
+              await fundIfNeeded(hre.ethers.provider, tester, seqAcc, 0);
               !isNative &&
                 (await sendToken(
                   await ethers.getContractAt("ERC20", tokenIn),
