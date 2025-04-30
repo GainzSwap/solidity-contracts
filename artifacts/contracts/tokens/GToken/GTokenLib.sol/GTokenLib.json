@@ -1,0 +1,76 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "GTokenLib",
+  "sourceName": "contracts/tokens/GToken/GTokenLib.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "MAX_EPOCHS_LOCK",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_EPOCHS_LOCK_PERCENT_LOSS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_PERCENT_LOSS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MIN_EPOCHS_LOCK",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MIN_EPOCHS_LOCK_PERCENT_LOSS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60d1610038600b82828239805160001a607314602b57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe7300000000000000000000000000000000000000003014608060405260043610605b5760003560e01c8063371648b31460605780634f76f31214607b578063872554c01460835780638b2ef8b114608c578063cbd91ab4146094575b600080fd5b6069620f424081565b60405190815260200160405180910390f35b606961c35081565b6069620493e081565b606961043881565b606960008156fea264697066735822122071f574ecda0d4712199a1a5d84dc830758dcf71cceb9a4c7bf9f5f205f5fda1c64736f6c634300081c0033",
+  "deployedBytecode": "0x7300000000000000000000000000000000000000003014608060405260043610605b5760003560e01c8063371648b31460605780634f76f31214607b578063872554c01460835780638b2ef8b114608c578063cbd91ab4146094575b600080fd5b6069620f424081565b60405190815260200160405180910390f35b606961c35081565b6069620493e081565b606961043881565b606960008156fea264697066735822122071f574ecda0d4712199a1a5d84dc830758dcf71cceb9a4c7bf9f5f205f5fda1c64736f6c634300081c0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

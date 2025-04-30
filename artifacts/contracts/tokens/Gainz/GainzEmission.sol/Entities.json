@@ -1,0 +1,76 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "Entities",
+  "sourceName": "contracts/tokens/Gainz/GainzEmission.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "GROWTH",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "LIQ_INCENTIVE",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "STAKING",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "TEAM",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "UNITY",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60d7610038600b82828239805160001a607314602b57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe7300000000000000000000000000000000000000003014608060405260043610605b5760003560e01c80633f65422114606057806384e4dbb914608157806397610f30146089578063a3f0713e146091578063cecdc6aa146099575b600080fd5b60686105dc81565b60405163ffffffff909116815260200160405180910390f35b60686101f481565b6068611b5881565b606861271081565b60686103e88156fea26469706673582212203bb06b4275c2f12e53aeabe9eeef4ac4f59b776a45312b5ad5a3328eba7a68e664736f6c634300081c0033",
+  "deployedBytecode": "0x7300000000000000000000000000000000000000003014608060405260043610605b5760003560e01c80633f65422114606057806384e4dbb914608157806397610f30146089578063a3f0713e146091578063cecdc6aa146099575b600080fd5b60686105dc81565b60405163ffffffff909116815260200160405180910390f35b60686101f481565b6068611b5881565b606861271081565b60686103e88156fea26469706673582212203bb06b4275c2f12e53aeabe9eeef4ac4f59b776a45312b5ad5a3328eba7a68e664736f6c634300081c0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

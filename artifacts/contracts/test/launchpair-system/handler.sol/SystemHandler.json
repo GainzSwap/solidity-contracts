@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "SystemHandler",
+  "sourceName": "contracts/test/launchpair-system/handler.sol",
+  "abi": [],
+  "bytecode": "0x6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea2646970667358221220af6d2ef48baf35afe40ffb72265baba1d9d83e624f6fa8722f641fefc2e3a51764736f6c634300081c0033",
+  "deployedBytecode": "0x6080604052600080fdfea2646970667358221220af6d2ef48baf35afe40ffb72265baba1d9d83e624f6fa8722f641fefc2e3a51764736f6c634300081c0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
